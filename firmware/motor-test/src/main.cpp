@@ -3,6 +3,7 @@
 #include <SimpleFOC.h>
 #include <SimpleFOCDrivers.h>
 #include "drivers/drv8316/drv8316.h"
+#include "current_sense/hardware_specific/samd/samd51_sensing.h"
 #include "ScopeData.h"
 
 #define MODE_SENSOR_TEST 0
@@ -14,8 +15,9 @@
 #define MODE_DIAG 6
 #define MODE_DRV_TEST 7
 #define MODE_SCOPE 8
+#define MODE_SENSING_SCOPE 9
 
-#define TEST_MODE MODE_SCOPE
+#define TEST_MODE MODE_SENSING_SCOPE
 #define USE_6PWM 0
 
 #define PIN_PWM_A 10
@@ -40,6 +42,7 @@
 #define TARGET_VELOCITY 8.0f
 
 BLDCMotor motor(POLE_PAIRS);
+LowsideCurrentSense current_sense(150.0f, A0, A1, A2);
 #if USE_6PWM
 DRV8316Driver6PWM driver(PIN_PWM_A, PIN_INL_A, PIN_PWM_B, PIN_INL_B, PIN_PWM_C, PIN_INL_C, PIN_DRV_CS, false, NOT_SET, PIN_NFAULT);
 #else
@@ -107,12 +110,22 @@ void sendScopeData() {
   data.enabled = motor.enabled;
   data.status = (uint32_t)motor.motor_status;
   data.n_fault = digitalRead(PIN_NFAULT);
+#if TEST_MODE == MODE_SENSING_SCOPE
+  PhaseCurrent_s currents = current_sense.getPhaseCurrents();
+  data.ia = currents.a;
+  data.ib = currents.b;
+  data.ic = currents.c;
+  data.va = _readSAMD51VoltageSense(A3);
+  data.vb = _readSAMD51VoltageSense(A4);
+  data.vc = _readSAMD51VoltageSense(A5);
+#else
   data.ia = 0.0f;
   data.ib = 0.0f;
   data.ic = 0.0f;
   data.va = 0.0f;
   data.vb = 0.0f;
   data.vc = 0.0f;
+#endif
   Serial.write("ScopeData\n", 10);
   Serial.write((uint8_t*)&data, sizeof(data));
 }
@@ -168,16 +181,26 @@ void setup() {
   driver.voltage_limit = VOLTAGE_LIMIT;
   driver.init(&SPI);
 
+#if TEST_MODE == MODE_SENSING_SCOPE
+  current_sense.linkDriver(&driver);
+  Serial.print("current sense init: ");
+  Serial.println(current_sense.init());
+  _configureSAMD51VoltageSense(A3, A4, A5);
+#endif
+
   motor.linkDriver(&driver);
   motor.linkSensor(&sensor);
   motor.voltage_limit = VOLTAGE_LIMIT;
   motor.voltage_sensor_align = VOLTAGE_LIMIT;
   motor.velocity_limit = 20.0f;
+#if TEST_MODE == MODE_SENSING_SCOPE
+  motor.linkCurrentSense(&current_sense);
+#endif
 
   Serial.print("driver initialized: ");
   Serial.println(driver.initialized);
 
-#if TEST_MODE == MODE_OPEN_LOOP || TEST_MODE == MODE_SCOPE
+#if TEST_MODE == MODE_OPEN_LOOP || TEST_MODE == MODE_SCOPE || TEST_MODE == MODE_SENSING_SCOPE
   motor.controller = MotionControlType::velocity_openloop;
   Serial.print("motor init: ");
   Serial.println(motor.init());
@@ -271,7 +294,7 @@ void loop() {
     Serial.print(" status ");
     Serial.println((int)motor.motor_status);
   }
-#elif TEST_MODE == MODE_SCOPE
+#elif TEST_MODE == MODE_SCOPE || TEST_MODE == MODE_SENSING_SCOPE
   motor.loopFOC();
   motor.move(TARGET_VELOCITY);
   static uint32_t last_scope = 0;

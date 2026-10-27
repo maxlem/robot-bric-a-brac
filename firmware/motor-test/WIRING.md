@@ -59,6 +59,12 @@ The Feather has one GND pin. Use a ground rail or a small 3-way junction: one wi
 - [ ] PSU positive -> `VBAT`
 - [ ] PSU negative -> `PGND`
 - [ ] EVM `J3-19 nFAULT` -> Feather `D4`
+- [ ] EVM `J3-14 ISENA` -> Feather `A0` (sensing)
+- [ ] EVM `J3-16 ISENB` -> Feather `A1` (sensing)
+- [ ] EVM `J3-18 ISENC` -> Feather `A2` (sensing)
+- [ ] EVM `J3-6 VSENA` -> Feather `A3` (sensing)
+- [ ] EVM `J3-8 VSENB` -> Feather `A4` (sensing)
+- [ ] EVM `J3-10 VSENC` -> Feather `A5` (sensing)
 
 ## 4. Feather M4 pins used
 
@@ -192,7 +198,7 @@ In `src/main.cpp`:
 
 | Setting | Default | Change when |
 |---|---|---|
-| `TEST_MODE` | `MODE_SCOPE` | use `MODE_SENSOR_TEST` when the AS5048A arrives, `MODE_OPEN_LOOP` for motor-only tests |
+| `TEST_MODE` | `MODE_SENSING_SCOPE` | use `MODE_SENSOR_TEST` when the AS5048A arrives, `MODE_OPEN_LOOP` for motor-only tests |
 | `USE_6PWM` | `0` | set to `1` only when you want 6-PWM with the existing wiring |
 | `ENCODER_TYPE` | `ENCODER_AS5048A` | set to `ENCODER_AS5047P` if that is your chip |
 | `POLE_PAIRS` | `7` | 14 magnets = 7 pole pairs, which matches this motor |
@@ -230,6 +236,9 @@ In `src/main.cpp`:
 - newline-terminated header `ScopeData`, then the binary `ScopeData` struct
 - struct definition: `firmware/motor-test/include/ScopeData.h`
 - fields: `t_us`, `target`, `angle`, `uq`, `enabled`, `status`, `n_fault`, `ia`, `ib`, `ic`, `va`, `vb`, `vc`
-- `ia`…`vc` are zero until the synchronized sensing port is implemented
+- `ia`…`vc` are populated in `MODE_SENSING_SCOPE` from A0–A5
+- `va`…`vc` are the raw ADC voltages from the EVM’s phase-voltage dividers; scale them with the divider ratio for actual phase volts
+
+Power the EVM at 12 V **before** resetting the Feather so the current-sense offset calibration sees the real 0 A bias. If you power it later, reset the Feather again.
 
 In SimpleFOCScope, set `headers = ["ScopeData.h"]` and `bauds = 115200`, and copy `ScopeData.h` into the app’s working directory.

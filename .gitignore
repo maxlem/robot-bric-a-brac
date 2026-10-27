@@ -1,2 +1,3 @@
 .pio/
 tools/SimpleFOCScope/
+third_party/Arduino-FOC/
