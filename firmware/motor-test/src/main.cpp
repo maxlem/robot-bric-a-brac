@@ -37,11 +37,13 @@
 
 #define POLE_PAIRS 7
 #define SUPPLY_VOLTAGE 12.0f
-#define VOLTAGE_LIMIT 1.5f
-#define TARGET_VELOCITY 8.0f
+#define VOLTAGE_LIMIT 0.8f
+#define TARGET_VELOCITY 5.0f
+#define MOTOR_RUN_TIMEOUT_MS 30000
 
 BLDCMotor motor(POLE_PAIRS);
 LowsideCurrentSense current_sense(150.0f, A0, A1, A2);
+uint32_t motor_start_ms = 0;
 #if USE_6PWM
 DRV8316Driver6PWM driver(PIN_PWM_A, PIN_INL_A, PIN_PWM_B, PIN_INL_B, PIN_PWM_C, PIN_INL_C, PIN_DRV_CS);
 #else
@@ -126,6 +128,7 @@ void sendScopeData() {
 void setup() {
   Serial.begin(115200);
   delay(3000);
+  analogRead(A3);
 
   pinMode(PIN_N_SLEEP, OUTPUT);
   digitalWrite(PIN_N_SLEEP, LOW);
@@ -173,57 +176,13 @@ void setup() {
   driver.voltage_power_supply = SUPPLY_VOLTAGE;
   driver.voltage_limit = VOLTAGE_LIMIT;
   driver.init(&SPI);
-  Serial.print("CSA gain before: ");
-  Serial.println((int)driver.getCurrentSenseGain());
   driver.setCurrentSenseGain(DRV8316_CSAGain::Gain_0V15);
-  Serial.print("CSA gain after: ");
-  Serial.println((int)driver.getCurrentSenseGain());
 
 #if TEST_MODE == MODE_SENSING_SCOPE
   current_sense.linkDriver(&driver);
   Serial.print("current sense init: ");
   Serial.println(current_sense.init());
   _configureSAMD51VoltageSense(A3, A4, A5);
-  delay(100);
-  Serial.print("ADC0 CTRLA: ");
-  Serial.println(ADC0->CTRLA.reg, HEX);
-  Serial.print("ADC0 EVCTRL: ");
-  Serial.println(ADC0->EVCTRL.reg, HEX);
-  Serial.print("ADC0 INTENSET: ");
-  Serial.println(ADC0->INTENSET.reg, HEX);
-  Serial.print("ADC0 INTFLAG: ");
-  Serial.println(ADC0->INTFLAG.reg, HEX);
-  Serial.print("ADC0 RESULT: ");
-  Serial.println(ADC0->RESULT.reg);
-  Serial.print("TCC0 CTRLA: ");
-  Serial.println(TCC0->CTRLA.reg, HEX);
-  Serial.print("TCC0 EVCTRL: ");
-  Serial.println(TCC0->EVCTRL.reg, HEX);
-  Serial.print("TCC0 PER: ");
-  Serial.println(TCC0->PER.reg);
-  Serial.print("TCC0 COUNT: ");
-  Serial.println(TCC0->COUNT.reg);
-  Serial.print("EVSYS CH0: ");
-  Serial.println(EVSYS->Channel[0].CHANNEL.reg, HEX);
-  Serial.print("EVSYS USER: ");
-  Serial.println(EVSYS->USER[EVSYS_ID_USER_ADC0_START].reg, HEX);
-  Serial.print("NVIC: ");
-  Serial.println(NVIC_GetEnableIRQ(ADC0_0_IRQn));
-  PhaseCurrent_s test_currents = current_sense.getPhaseCurrents();
-  Serial.print("test I: ");
-  Serial.print(test_currents.a, 4);
-  Serial.print(",");
-  Serial.print(test_currents.b, 4);
-  Serial.print(",");
-  Serial.println(test_currents.c, 4);
-  Serial.print("test V: ");
-  Serial.print(_readSAMD51VoltageSense(A3), 4);
-  Serial.print(",");
-  Serial.print(_readSAMD51VoltageSense(A4), 4);
-  Serial.print(",");
-  Serial.println(_readSAMD51VoltageSense(A5), 4);
-  Serial.print("sensing service: ");
-  Serial.println(_getSAMD51SensingIsrCount());
 #endif
 
   motor.linkDriver(&driver);
@@ -242,6 +201,7 @@ void setup() {
   motor.controller = MotionControlType::velocity_openloop;
   Serial.print("motor init: ");
   Serial.println(motor.init());
+  motor_start_ms = millis();
 #else
   motor.controller = MotionControlType::velocity;
   motor.init();
@@ -333,6 +293,15 @@ void loop() {
     Serial.println((int)motor.motor_status);
   }
 #elif TEST_MODE == MODE_SCOPE || TEST_MODE == MODE_SENSING_SCOPE
+  static bool motor_tripped = false;
+  if (!motor_tripped && millis() - motor_start_ms > MOTOR_RUN_TIMEOUT_MS) {
+    motor_tripped = true;
+    motor.disable();
+    digitalWrite(PIN_N_SLEEP, LOW);
+  }
+#if TEST_MODE == MODE_SENSING_SCOPE
+  _serviceSAMD51Sensing();
+#endif
   motor.loopFOC();
   motor.move(TARGET_VELOCITY);
   static uint32_t last_scope = 0;
