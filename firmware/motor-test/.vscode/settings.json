@@ -1,0 +1,9 @@
+{
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1000,
+  "files.watcherExclude": {
+    "**/.pio/**": true,
+    "**/.git/objects/**": true
+  },
+  "platformio-ide.activateProjectOnTextEditorChange": true
+}
