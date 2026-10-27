@@ -101,7 +101,6 @@ void testDRV() {
 
 void sendScopeData() {
   ScopeData data;
-  data.t_us = micros();
   data.target = motor.target;
   data.angle = motor.shaft_angle;
   data.uq = motor.voltage.q;
