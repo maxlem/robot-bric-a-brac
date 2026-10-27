@@ -3,6 +3,7 @@
 #include <SimpleFOC.h>
 #include <SimpleFOCDrivers.h>
 #include "drivers/drv8316/drv8316.h"
+#include "ScopeData.h"
 
 #define MODE_SENSOR_TEST 0
 #define MODE_OPEN_LOOP 1
@@ -12,8 +13,9 @@
 #define MODE_PIN_LOOPBACK 5
 #define MODE_DIAG 6
 #define MODE_DRV_TEST 7
+#define MODE_SCOPE 8
 
-#define TEST_MODE MODE_OPEN_LOOP
+#define TEST_MODE MODE_SCOPE
 #define USE_6PWM 0
 
 #define PIN_PWM_A 10
@@ -25,6 +27,7 @@
 #define PIN_DRV_CS 9
 #define PIN_N_SLEEP 6
 #define PIN_ENC_CS 5
+#define PIN_NFAULT 4
 
 #define ENCODER_AS5047P 0
 #define ENCODER_AS5048A 1
@@ -38,9 +41,9 @@
 
 BLDCMotor motor(POLE_PAIRS);
 #if USE_6PWM
-DRV8316Driver6PWM driver(PIN_PWM_A, PIN_INL_A, PIN_PWM_B, PIN_INL_B, PIN_PWM_C, PIN_INL_C, PIN_DRV_CS);
+DRV8316Driver6PWM driver(PIN_PWM_A, PIN_INL_A, PIN_PWM_B, PIN_INL_B, PIN_PWM_C, PIN_INL_C, PIN_DRV_CS, false, NOT_SET, PIN_NFAULT);
 #else
-DRV8316Driver3PWM driver(PIN_PWM_A, PIN_PWM_B, PIN_PWM_C, PIN_DRV_CS);
+DRV8316Driver3PWM driver(PIN_PWM_A, PIN_PWM_B, PIN_PWM_C, PIN_DRV_CS, false, NOT_SET, PIN_NFAULT);
 #endif
 
 #if ENCODER_TYPE == ENCODER_AS5047P
@@ -94,6 +97,25 @@ void testDRV() {
   Serial.print("PWM100 restored: ");
   Serial.println((int)driver.getPWM100Frequency());
   if (status.isFault()) driver.clearFault();
+}
+
+void sendScopeData() {
+  ScopeData data;
+  data.t_us = micros();
+  data.target = motor.target;
+  data.angle = motor.shaft_angle;
+  data.uq = motor.voltage.q;
+  data.enabled = motor.enabled;
+  data.status = (uint32_t)motor.motor_status;
+  data.n_fault = digitalRead(PIN_NFAULT);
+  data.ia = 0.0f;
+  data.ib = 0.0f;
+  data.ic = 0.0f;
+  data.va = 0.0f;
+  data.vb = 0.0f;
+  data.vc = 0.0f;
+  Serial.write("ScopeData\n", 10);
+  Serial.write((uint8_t*)&data, sizeof(data));
 }
 
 void setup() {
@@ -156,7 +178,7 @@ void setup() {
   Serial.print("driver initialized: ");
   Serial.println(driver.initialized);
 
-#if TEST_MODE == MODE_OPEN_LOOP
+#if TEST_MODE == MODE_OPEN_LOOP || TEST_MODE == MODE_SCOPE
   motor.controller = MotionControlType::velocity_openloop;
   Serial.print("motor init: ");
   Serial.println(motor.init());
@@ -249,6 +271,14 @@ void loop() {
     Serial.print(motor.enabled);
     Serial.print(" status ");
     Serial.println((int)motor.motor_status);
+  }
+#elif TEST_MODE == MODE_SCOPE
+  motor.loopFOC();
+  motor.move(TARGET_VELOCITY);
+  static uint32_t last_scope = 0;
+  if (micros() - last_scope >= 10000) {
+    last_scope = micros();
+    sendScopeData();
   }
 #else
   motor.loopFOC();
