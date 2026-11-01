@@ -1,3 +1,20 @@
+# PlatformIO build output and dependencies
 .pio/
-tools/SimpleFOCScope/
-third_party/Arduino-FOC/
+.pioenvs/
+.piolibdeps/
+
+# Generated compile database (recreated by pio run)
+compile_commands.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Editors and OS
+.DS_Store
+Thumbs.db
+
+# Local backups
+*.bak

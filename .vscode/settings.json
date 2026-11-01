@@ -5,5 +5,9 @@
     "**/.pio/**": true,
     "**/.git/objects/**": true
   },
-  "platformio-ide.activateProjectOnTextEditorChange": true
+  "platformio-ide.activateProjectOnTextEditorChange": true,
+  "C_Cpp.default.compileCommands": "${workspaceFolder}/firmware/motor-test/compile_commands.json",
+  "C_Cpp.default.intelliSenseMode": "gcc-arm",
+  "C_Cpp.default.cppStandard": "c++11",
+  "C_Cpp.default.cStandard": "c11"
 }

@@ -1,0 +1,7 @@
+[submodule "third_party/Arduino-FOC"]
+	path = third_party/Arduino-FOC
+	url = https://github.com/maxlem/Arduino-FOC.git
+	branch = feat/same51-sync-sensing
+[submodule "tools/SimpleFOCScope"]
+	path = tools/SimpleFOCScope
+	url = https://github.com/maxlem/SimpleFOCScope.git
