@@ -46,10 +46,10 @@ assumed. Do not act on assumed numbers.
 The protocol that replaces them with measured ones is in
 [`docs/motor-identification.md`](docs/motor-identification.md).
 
-## Flashing without the BOOT button
+## Flashing the MicroSpora
 
-The MicroSpora firmware accepts a `dfu` command on the USB serial port and
-jumps to the system bootloader, so later flashes need no button presses. See
+Each flash needs BOOT + RESET to enter the DFU bootloader; SWD is not broken
+out on the board, so there is no debugger path. See
 [`docs/bringup-microspora.md`](docs/bringup-microspora.md).
 
 ## Submodules

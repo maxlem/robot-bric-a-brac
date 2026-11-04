@@ -11,7 +11,6 @@
 // generated motor_params.h, so firmware and simulation share one source.
 
 #include <Arduino.h>
-#include <string.h>
 #include <SPI.h>
 #include <SimpleFOC.h>
 #include <SimpleFOCDrivers.h>
@@ -50,44 +49,6 @@ LowsideCurrentSense current_sense =
 SPIClass SPI_encoder(ENC_NC, ENC_SDO, ENC_CLK);
 SPIClass SPI_driver(PB5_ALT1, PB4_ALT1, PC10);
 
-
-// Jump into the STM32 system bootloader so the host can flash without touching
-// BOOT0. The bootloader stays mapped at 0x1FFF0000 even with BOOT0 low.
-static void jumpToDfu() {
-  Serial.println("jumping to DFU");
-  Serial.flush();
-  // Let the USB transfer finish; jumping mid-transfer leaves the bootloader
-  // unable to enumerate and the chip appears hung.
-  delay(300);
-  // Minimal handover: no HAL_RCC_DeInit here, it disables the HSI48 clock the
-  // bootloader needs for USB and the core hangs.
-  __disable_irq();
-  SysTick->CTRL = 0;
-  SysTick->LOAD = 0;
-  SysTick->VAL = 0;
-  const uint32_t base = 0x1FFF0000;
-  __set_MSP(*reinterpret_cast<volatile uint32_t*>(base));
-  void (*entry)(void) =
-      reinterpret_cast<void (*)(void)>(*reinterpret_cast<volatile uint32_t*>(base + 4));
-  entry();
-}
-
-// One-line serial commands, available in every mode.
-static void pollCommands() {
-  static char buffer[16];
-  static uint8_t length = 0;
-  while (Serial.available()) {
-    char c = Serial.read();
-    if (c == '\n' || c == '\r') {
-      buffer[length] = 0;
-      if (strcmp(buffer, "dfu") == 0) jumpToDfu();
-      else if (length > 0) Serial.println("commands: dfu");
-      length = 0;
-    } else if (length < sizeof(buffer) - 1) {
-      buffer[length++] = c;
-    }
-  }
-}
 
 // Scale comes from hardware/motor_params.json, calibrated against a
 // multimeter; the VSCALE build flag is only the datasheet starting point.
@@ -146,6 +107,17 @@ void setup() {
   driver.setOCPMode(NoAction);
   driver.setCurrentSenseGain(Gain_0V375);
 
+  DRV8316Status status = driver.getStatus();
+  Serial.print("driver fault: ");
+  Serial.print(status.isFault() ? "YES" : "no");
+  Serial.print("  spi error: ");
+  Serial.print(status.isSPIError() ? "YES" : "no");
+  Serial.print("  pwm mode: ");
+  Serial.print((int)driver.getPWMMode());
+  Serial.print("  supply: ");
+  Serial.print(driver.voltage_power_supply, 2);
+  Serial.println(" V");
+
   current_sense.linkDriver(&driver);
   if (!current_sense.init()) {
     Serial.println("current sense init failed");
@@ -189,8 +161,6 @@ void setup() {
 }
 
 void loop() {
-  pollCommands();
-
 #if TEST_MODE == MODE_BLINK
   digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
   delay(500);
@@ -232,7 +202,8 @@ void loop() {
   }
 
 #if TEST_MODE == MODE_OPENLOOP
-  motor.loopFOC();
+  // No loopFOC here: open loop must not use the sensor, and loopFOC would
+  // commute from a meaningless angle and freeze the voltage vector.
   motor.move(OPENLOOP_VELOCITY);
   if (millis() - last_print >= PRINT_PERIOD_MS) {
     last_print = millis();
@@ -243,6 +214,8 @@ void loop() {
     Serial.print(currents.b, 3);
     Serial.print(" ic ");
     Serial.print(-(currents.a + currents.b), 3);
+    Serial.print("  Ua ");
+    Serial.print(motor.Ua, 3);
     Serial.print("  angle ");
     Serial.println(sensor.getAngle(), 3);
   }

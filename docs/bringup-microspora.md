@@ -41,18 +41,13 @@ sudo udevadm trigger --action=add --subsystem-match=usb
 `dfu-util: Error during download get_status` at the end is harmless; the image
 is already written and the board reboots.
 
-### Afterwards, without the button
+### Every time
 
-The firmware accepts a `dfu` command on the USB serial port and jumps to the
-system bootloader itself:
-
-```bash
-printf 'dfu\n' > /dev/ttyACM0
-# wait for 0483:df11, then:
-pio run -d firmware/microspora-bringup -t upload
-```
-
-The BOOT button remains the recovery path if a flashed image does not run.
+The BOOT/RESET cycle is needed for each flash. A software jump to the system
+bootloader was tried and removed: on this board the USB handover is unreliable
+and the core hangs instead of enumerating, which strands the firmware until the
+button is pressed anyway. Debugger access would solve it, but the SWD pins are
+not broken out (SWDIO PA13 is not on any header; only SWCLK PA14 is).
 
 ## Test modes
 
