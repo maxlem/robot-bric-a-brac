@@ -56,12 +56,13 @@ SPIClass SPI_driver(PB5_ALT1, PB4_ALT1, PC10);
 static void jumpToDfu() {
   Serial.println("jumping to DFU");
   Serial.flush();
-  delay(100);
-  HAL_RCC_DeInit();
+  delay(50);
+  // Minimal handover: no HAL_RCC_DeInit here, it disables the HSI48 clock the
+  // bootloader needs for USB and the core hangs.
+  __disable_irq();
   SysTick->CTRL = 0;
   SysTick->LOAD = 0;
   SysTick->VAL = 0;
-  __disable_irq();
   const uint32_t base = 0x1FFF0000;
   __set_MSP(*reinterpret_cast<volatile uint32_t*>(base));
   void (*entry)(void) =
@@ -86,7 +87,9 @@ static void pollCommands() {
   }
 }
 
-static float busVoltage() { return _readRegularADCVoltage(VSENS) * VSCALE; }
+// Scale comes from hardware/motor_params.json, calibrated against a
+// multimeter; the VSCALE build flag is only the datasheet starting point.
+static float busVoltage() { return _readRegularADCVoltage(VSENS) * MOTOR_VBUS_SCALE; }
 
 static bool voltageOk() {
   float voltage = busVoltage();
