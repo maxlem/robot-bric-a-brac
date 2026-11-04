@@ -27,7 +27,7 @@
 #define MODE_OPENLOOP 3
 #define MODE_CURRENT 4
 
-#define TEST_MODE MODE_ENCODER
+#define TEST_MODE MODE_OPENLOOP
 
 // Below this the DRV8316 is not supposed to run the motor at all.
 #define SUPPLY_MIN_V 8.0f
@@ -56,7 +56,9 @@ SPIClass SPI_driver(PB5_ALT1, PB4_ALT1, PC10);
 static void jumpToDfu() {
   Serial.println("jumping to DFU");
   Serial.flush();
-  delay(50);
+  // Let the USB transfer finish; jumping mid-transfer leaves the bootloader
+  // unable to enumerate and the chip appears hung.
+  delay(300);
   // Minimal handover: no HAL_RCC_DeInit here, it disables the HSI48 clock the
   // bootloader needs for USB and the core hangs.
   __disable_irq();
@@ -93,14 +95,11 @@ static float busVoltage() { return _readRegularADCVoltage(VSENS) * MOTOR_VBUS_SC
 
 static bool voltageOk() {
   float voltage = busVoltage();
+  if (voltage >= SUPPLY_MIN_V) return true;
   Serial.print("bus voltage: ");
   Serial.print(voltage, 2);
-  Serial.println(" V");
-  if (voltage < SUPPLY_MIN_V) {
-    Serial.println("refusing to drive the motor below SUPPLY_MIN_V");
-    return false;
-  }
-  return true;
+  Serial.println(" V, refusing to drive the motor below SUPPLY_MIN_V");
+  return false;
 }
 
 void setup() {
@@ -223,10 +222,13 @@ void loop() {
 #endif
 
   static uint32_t last_print = 0;
-  if (!voltageOk()) {
-    motor.disable();
-    delay(1000);
-    return;
+  static uint32_t last_voltage_check = 0;
+  if (millis() - last_voltage_check >= 200) {
+    last_voltage_check = millis();
+    if (!voltageOk()) {
+      motor.disable();
+      return;
+    }
   }
 
 #if TEST_MODE == MODE_OPENLOOP
