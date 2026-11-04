@@ -107,6 +107,14 @@ and `LowsideCurrentSense(375.0f, ISENS_A, ISENS_B, ISENS_C)`. The current-sense
 configuration here is identical to theirs, so a current-sense fault is not a
 configuration mismatch.
 
+## Open loop on the official configuration
+
+With 6-PWM, `dead_zone = 0.001f`, 25 kHz, 200 V/us slew and the 5 V buck, open
+loop at 0.5 V turns the motor smoothly. The three phase currents are sinusoidal,
+change every sample, and sum to zero; `Ua` sweeps through the full range. This is
+the same configuration as `simplefoc/microspora_simplefoc_firmware`, so the
+3-PWM workaround is no longer needed.
+
 ## Next after bring-up
 
 Run `docs/motor-identification.md` in order: current offsets and gain, inverter

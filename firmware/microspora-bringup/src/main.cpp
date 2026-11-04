@@ -30,7 +30,7 @@
 #define MODE_IDENT_R 6
 #define MODE_CHARACTERISE 7
 
-#define TEST_MODE MODE_CHARACTERISE
+#define TEST_MODE MODE_OPENLOOP
 
 // The official MicroSpora firmware uses 6-PWM, and so does the DRV8316 driver
 // class by default. 3-PWM was only a workaround for the 6-PWM build that
