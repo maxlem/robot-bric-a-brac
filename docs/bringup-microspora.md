@@ -60,12 +60,18 @@ Set `TEST_MODE` at the top of `src/main.cpp`, rebuild, flash.
 | `MODE_ENCODER` | MT6701 wiring, direction, magnet centring | smooth monotonic angle over a turn |
 | `MODE_OPENLOOP` | phase order, current polarity | shaft turns slowly, `ia + ib + ic` ≈ 0 |
 | `MODE_CURRENT` | alignment and current loop | `id` near 0, `iq` follows the target |
+| `MODE_CHARACTERISE` | current sense, R and L | result 0, R ≈ 0.15 Ω, L in tens of µH |
 
 ### Calibration done so far
 
-- `vbus_scale`: 12.04 V measured against 11.450 V reported at scale 11.0, so the
-  calibrated value is **11.57**. Recorded in `hardware/motor_params.json` with
-  provenance `bench`.
+- `vbus_scale`: **11.0**, the datasheet divider ratio. The earlier 11.57 was
+  compensating for a library bug, not a resistor tolerance: `_readRegularADCVoltage`
+  used the shortest ADC sampling time (2.5 cycles), which is too short for the
+  47k/4.7k divider (Thevenin ~4.3 kΩ), so the bus voltage read ~5 % low. The fork
+  now uses 247.5 cycles and the reading matches the multimeter at 11.0.
+- `R_phase`: 0.15 Ω from a milliohm meter; `characteriseMotor` measured 0.153 Ω.
+- `Ld` / `Lq`: 37.6 µH / 48.1 µH from `characteriseMotor`. The 12 mH placeholder
+  was ~300× too high.
 
 ## What prevented rotation (recorded because it cost a session)
 
@@ -85,6 +91,21 @@ Three separate defects, each enough on its own:
 
 Symptom of (2) and (3) is identical: `ia/ib/ic` constant, rotor moves a fraction
 of a turn and stops. Symptom of (1) is different: no current at all.
+
+A fourth defect made the first 6-PWM build look dead: `BLDCDriver6PWM` defaults
+to a dead time of **2 % of the PWM period**. At 0.5 V on a 12 V bus (4 % duty)
+that cancels most of the output. The official MicroSpora firmware sets
+`driver.dead_zone = 0.001f` (0.1 %), and so does this project now. The 3-PWM
+workaround was only needed because of this.
+
+## Match the official firmware
+
+`simplefoc/microspora_simplefoc_firmware` is the reference. The settings that
+matter: 6-PWM, `pwm_frequency = 25000`, `dead_zone = 0.001f`,
+`setSlew(Slew_200Vus)`, `setBuckVoltage(VB_5V)`, `setCurrentSenseGain(Gain_0V375)`,
+and `LowsideCurrentSense(375.0f, ISENS_A, ISENS_B, ISENS_C)`. The current-sense
+configuration here is identical to theirs, so a current-sense fault is not a
+configuration mismatch.
 
 ## Next after bring-up
 
