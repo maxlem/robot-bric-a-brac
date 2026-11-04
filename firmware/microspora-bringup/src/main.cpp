@@ -203,7 +203,10 @@ void setup() {
 #endif
 
   driver.voltage_power_supply = busVoltage();
-  driver.voltage_limit = VOLTAGE_LIMIT;
+  // The driver limit is the hardware ceiling; motor.voltage_limit is the
+  // safety limit. Clamping the driver to VOLTAGE_LIMIT makes the WebController
+  // voltage slider ineffective, because setPwm() clamps every phase to it.
+  driver.voltage_limit = busVoltage();
   // Match the official MicroSpora firmware. BLDCDriver6PWM defaults to a dead
   // time of 2 % of the PWM period; at 0.5 V on a 12 V bus (4 % duty) that
   // cancels most of the output, which is why the first 6-PWM build looked dead.
