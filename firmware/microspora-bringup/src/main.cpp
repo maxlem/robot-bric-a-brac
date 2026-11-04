@@ -27,7 +27,7 @@
 #define MODE_OPENLOOP 3
 #define MODE_CURRENT 4
 
-#define TEST_MODE MODE_VSENS
+#define TEST_MODE MODE_ENCODER
 
 // Below this the DRV8316 is not supposed to run the motor at all.
 #define SUPPLY_MIN_V 8.0f

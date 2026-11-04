@@ -26,21 +26,32 @@ def main() -> int:
     parser.add_argument("--port", default="/dev/ttyACM0")
     parser.add_argument("--baud", type=int, default=250000)
     parser.add_argument("--seconds", type=float, default=15.0)
+    parser.add_argument(
+        "--follow",
+        action="store_true",
+        help="print every sample until Ctrl+C, then print the summary",
+    )
     args = parser.parse_args()
 
     angles: list[float] = []
     with serial.Serial(args.port, args.baud, timeout=0.2) as port:
-        print(f"reading {args.port} for {args.seconds:.0f} s; turn the shaft slowly")
-        deadline = time.time() + args.seconds
-        while time.time() < deadline:
-            line = port.readline().decode("ascii", "replace").strip()
-            match = LINE.search(line)
-            if not match:
-                continue
-            angle, velocity = float(match.group(1)), float(match.group(2))
-            angles.append(angle)
-            if len(angles) % 5 == 0:
-                print(f"  angle {angle:+.3f} rad  velocity {velocity:+.3f} rad/s")
+        if args.follow:
+            print(f"reading {args.port}; turn the shaft, Ctrl+C to stop")
+        else:
+            print(f"reading {args.port} for {args.seconds:.0f} s; turn the shaft slowly")
+        deadline = float("inf") if args.follow else time.time() + args.seconds
+        try:
+            while time.time() < deadline:
+                line = port.readline().decode("ascii", "replace").strip()
+                match = LINE.search(line)
+                if not match:
+                    continue
+                angle, velocity = float(match.group(1)), float(match.group(2))
+                angles.append(angle)
+                if args.follow or len(angles) % 5 == 0:
+                    print(f"  angle {angle:+.3f} rad  velocity {velocity:+.3f} rad/s")
+        except KeyboardInterrupt:
+            pass
 
     if len(angles) < 3:
         print("no encoder samples: is the firmware in MODE_ENCODER?")
@@ -58,7 +69,8 @@ def main() -> int:
 
     steps = [b - a for a, b in zip(unwrapped, unwrapped[1:])]
     largest = max(steps, key=abs)
-    mean_speed = (unwrapped[-1] - unwrapped[0]) / args.seconds
+    elapsed = args.seconds if not args.follow else max(len(angles), 1) * 0.5
+    mean_speed = (unwrapped[-1] - unwrapped[0]) / elapsed
 
     print("\nsummary")
     print(f"  samples          {len(angles)}")
