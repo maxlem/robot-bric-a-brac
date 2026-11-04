@@ -26,8 +26,9 @@
 #define MODE_OPENLOOP 3
 #define MODE_CURRENT 4
 #define MODE_STATIC 5
+#define MODE_IDENT_R 6
 
-#define TEST_MODE MODE_OPENLOOP
+#define TEST_MODE MODE_IDENT_R
 
 // The Feather drove this motor through the same DRV8316 in 3-PWM mode, with the
 // low-side inputs held high. Keep that as a switch so the two can be compared.
@@ -85,6 +86,47 @@ static void printConfig() {
   Serial.print(drv.isSPIError() ? 1 : 0);
   Serial.print(" | Ua ");
   Serial.println(motor.voltage.q, 3);
+}
+
+static float busVoltage();
+
+// Hold a fixed electrical angle and sweep the applied voltage in both
+// polarities. At standstill the winding is purely resistive, so
+// V_applied = R_total * I and the shortfall against duty * V_bus is the
+// inverter error (dead time plus conduction drops).
+static void identifyResistance() {
+  static const float levels[] = {0.05f, 0.10f, 0.20f, 0.35f, 0.50f};
+  Serial.println("ident R: fixed angle, voltage sweep, both polarities");
+  Serial.println("v_cmd v_bus ia ib ic");
+  for (float level : levels) {
+    for (int polarity = 1; polarity >= -1; polarity -= 2) {
+      motor.setPhaseVoltage(polarity * level, 0.0f, 0.0f);
+      delay(400);
+      float sum_a = 0, sum_b = 0, sum_c = 0;
+      int samples = 0;
+      uint32_t start = millis();
+      while (millis() - start < 200) {
+        PhaseCurrent_s currents = current_sense.getPhaseCurrents();
+        sum_a += currents.a;
+        sum_b += currents.b;
+        sum_c += -(currents.a + currents.b);
+        samples++;
+        delay(5);
+      }
+      float voltage = busVoltage();
+      Serial.print(polarity * level, 3);
+      Serial.print(" ");
+      Serial.print(voltage, 3);
+      Serial.print(" ");
+      Serial.print(sum_a / samples, 3);
+      Serial.print(" ");
+      Serial.print(sum_b / samples, 3);
+      Serial.print(" ");
+      Serial.println(sum_c / samples, 3);
+    }
+  }
+  motor.setPhaseVoltage(0.0f, 0.0f, 0.0f);
+  Serial.println("ident R done");
 }
 
 static float busVoltage() { return _readRegularADCVoltage(VSENS) * MOTOR_VBUS_SCALE; }
@@ -180,6 +222,15 @@ void setup() {
   motor.voltage_limit = VOLTAGE_LIMIT;
   motor.velocity_limit = 20.0f;
   motor.motion_downsample = 4;
+
+  if (TEST_MODE == MODE_IDENT_R) {
+    if (!motor.init()) {
+      Serial.println("motor init failed");
+      return;
+    }
+    identifyResistance();
+    return;
+  }
 
   if (TEST_MODE == MODE_STATIC) {
     if (!motor.init()) {
