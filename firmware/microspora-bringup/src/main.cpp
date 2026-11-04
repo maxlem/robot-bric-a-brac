@@ -6,6 +6,7 @@
 //   MODE_ENCODER   MT6701 angle, direction, eccentricity
 //   MODE_OPENLOOP  phases wired correctly, currents sum to zero
 //   MODE_CURRENT   closed-loop current control, for tuning
+//   MODE_CHARACTERISE  SimpleFOC's own R/L identification (needs current sense)
 //
 // The motor parameters come from hardware/motor_params.json through the
 // generated motor_params.h, so firmware and simulation share one source.
@@ -27,12 +28,14 @@
 #define MODE_CURRENT 4
 #define MODE_STATIC 5
 #define MODE_IDENT_R 6
+#define MODE_CHARACTERISE 7
 
-#define TEST_MODE MODE_IDENT_R
+#define TEST_MODE MODE_CHARACTERISE
 
-// The Feather drove this motor through the same DRV8316 in 3-PWM mode, with the
-// low-side inputs held high. Keep that as a switch so the two can be compared.
-#define USE_3PWM 1
+// The official MicroSpora firmware uses 6-PWM, and so does the DRV8316 driver
+// class by default. 3-PWM was only a workaround for the 6-PWM build that
+// produced no output; that build was missing the dead-time setting below.
+#define USE_3PWM 0
 
 // Below this the DRV8316 is not supposed to run the motor at all.
 #define SUPPLY_MIN_V 8.0f
@@ -189,12 +192,20 @@ void setup() {
 
   driver.voltage_power_supply = busVoltage();
   driver.voltage_limit = VOLTAGE_LIMIT;
+  // Match the official MicroSpora firmware. BLDCDriver6PWM defaults to a dead
+  // time of 2 % of the PWM period; at 0.5 V on a 12 V bus (4 % duty) that
+  // cancels most of the output, which is why the first 6-PWM build looked dead.
+  // The DRV8316 needs about 0.1 %.
+  driver.pwm_frequency = 25000;
+  driver.dead_zone = 0.001f;
   driver.init(&SPI_driver);
 #if !USE_3PWM
   driver.setPWMMode(PWM6_Mode);
 #endif
+  driver.setSlew(Slew_200Vus);
   driver.setOCPMode(NoAction);
   driver.setCurrentSenseGain(Gain_0V375);
+  driver.setBuckVoltage(VB_5V);
 
   DRV8316Status status = driver.getStatus();
   Serial.print("driver fault: ");
@@ -222,6 +233,38 @@ void setup() {
   motor.voltage_limit = VOLTAGE_LIMIT;
   motor.velocity_limit = 20.0f;
   motor.motion_downsample = 4;
+
+  if (TEST_MODE == MODE_CHARACTERISE) {
+    if (!motor.init()) {
+      Serial.println("motor init failed");
+      return;
+    }
+    // SimpleFOC's own identification: ramps a d-axis voltage to measure R, then
+    // steps it to measure L. It needs a working current sense and returns 3
+    // ("current too low") when the chain cannot see the current, so this doubles
+    // as the current-sense test. No sensor is linked, so it runs at angle 0.
+    Serial.println("characterise: measuring R and L, the rotor will not turn");
+    // BLDCMotor's wrapper hardcodes correction_factor = 1.0, which reports
+    // 3x R_phase. Call the base class with 1.5 so phase_resistance is the
+    // phase-to-phase value (2x R_phase) that the milliohm meter measured.
+    int result = motor.FOCMotor::characteriseMotor(VOLTAGE_LIMIT, 1.5f);
+    Serial.print("characterise result: ");
+    Serial.println(result);
+    if (result == 0) {
+      Serial.print("R phase-to-phase: ");
+      Serial.print(motor.phase_resistance, 4);
+      Serial.println(" ohm");
+      Serial.print("Ld: ");
+      Serial.print(motor.axis_inductance.d * 1e6f, 2);
+      Serial.println(" uH");
+      Serial.print("Lq: ");
+      Serial.print(motor.axis_inductance.q * 1e6f, 2);
+      Serial.println(" uH");
+    } else {
+      Serial.println("characterise failed; the current sense is not usable yet");
+    }
+    return;
+  }
 
   if (TEST_MODE == MODE_IDENT_R) {
     if (!motor.init()) {

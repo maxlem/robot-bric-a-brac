@@ -2,7 +2,7 @@
   "schema": 1,
   "status": "placeholder",
   "motor": "4108-class gimbal, 7 pole pairs, to be measured",
-  "notes": "Phase-to-phase resistance measured 0.30/0.29/0.30 ohm with a milliohm meter, so R_phase = 0.15 ohm: a low-resistance drone-class motor, not a gimbal motor. R_total adds two DRV8316 FETs (~0.2 ohm) and must be measured with the DC hold test.",
+  "notes": "Phase-to-phase resistance measured 0.30/0.29/0.30 ohm with a milliohm meter, so R_phase = 0.15 ohm: a low-resistance drone-class motor, not a gimbal motor. R_total adds two DRV8316 FETs (~0.2 ohm) and must be measured with the DC hold test. The bus voltage read 5% low because the library used the shortest ADC sampling time on a 4.3k source; the library now uses 247.5 cycles, so the divider ratio is the datasheet 11.0 again.",
   "provenance": {
     "pole_pairs": "datasheet",
     "r_phase_ohm": "bench",
@@ -16,7 +16,7 @@
     "tc_nm": "assumed",
     "v_dead_v": "assumed",
     "current_offset_a": "assumed",
-    "vbus_scale": "bench",
+    "vbus_scale": "datasheet (4.7k/47k); ADC sampling time fixed in the library",
     "current_sense_mv_per_a": "datasheet"
   },
   "pole_pairs": 7,
@@ -35,6 +35,6 @@
     0.0,
     0.0
   ],
-  "vbus_scale": 11.57,
+  "vbus_scale": 11.0,
   "current_sense_mv_per_a": 375.0
 }
