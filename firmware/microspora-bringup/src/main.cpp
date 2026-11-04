@@ -30,7 +30,7 @@
 
 // Below this the DRV8316 is not supposed to run the motor at all.
 #define SUPPLY_MIN_V 8.0f
-#define VOLTAGE_LIMIT 1.5f
+#define VOLTAGE_LIMIT 0.3f
 #define OPENLOOP_VELOCITY 5.0f  // rad/s, slow enough to see a wiring error
 #define CURRENT_TARGET_A 0.2f
 #define PRINT_PERIOD_MS 500
@@ -52,6 +52,25 @@ SPIClass SPI_driver(PB5_ALT1, PB4_ALT1, PC10);
 
 // Scale comes from hardware/motor_params.json, calibrated against a
 // multimeter; the VSCALE build flag is only the datasheet starting point.
+// Bring-up convenience: repeat the configuration periodically so it can be
+// read without catching the boot banner.
+static void printConfig() {
+  Serial.print("cfg: motor ");
+  Serial.print(MOTOR_NAME);
+  Serial.print(" | mode ");
+  Serial.print(TEST_MODE);
+  Serial.print(" | enabled ");
+  Serial.print(motor.enabled ? 1 : 0);
+  Serial.print(" | status ");
+  Serial.print((int)motor.motor_status);
+  Serial.print(" | volt_limit ");
+  Serial.print(motor.voltage_limit, 2);
+  Serial.print(" | supply ");
+  Serial.print(driver.voltage_power_supply, 2);
+  Serial.print(" | pwm ");
+  Serial.println((int)driver.getPWMMode());
+}
+
 static float busVoltage() { return _readRegularADCVoltage(VSENS) * MOTOR_VBUS_SCALE; }
 
 static bool voltageOk() {
@@ -161,6 +180,12 @@ void setup() {
 }
 
 void loop() {
+  static uint32_t last_config = 0;
+  if (millis() - last_config >= 5000) {
+    last_config = millis();
+    printConfig();
+  }
+
 #if TEST_MODE == MODE_BLINK
   digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
   delay(500);
@@ -216,6 +241,10 @@ void loop() {
     Serial.print(-(currents.a + currents.b), 3);
     Serial.print("  Ua ");
     Serial.print(motor.Ua, 3);
+    Serial.print("  enabled ");
+    Serial.print(motor.enabled ? 1 : 0);
+    Serial.print("  status ");
+    Serial.print((int)motor.motor_status);
     Serial.print("  angle ");
     Serial.println(sensor.getAngle(), 3);
   }

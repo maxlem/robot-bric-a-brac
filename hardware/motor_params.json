@@ -2,10 +2,10 @@
   "schema": 1,
   "status": "placeholder",
   "motor": "4108-class gimbal, 7 pole pairs, to be measured",
-  "notes": "Every value here is an assumption until docs/motor-identification.md has been run. provenance records where each number came from: bench, in_situ, datasheet, or assumed. vbus_scale calibrated against a multimeter: 12.04 V measured, 11.45 V reported, scale 11.57.",
+  "notes": "Phase-to-phase resistance measured 0.30/0.29/0.30 ohm with a milliohm meter, so R_phase = 0.15 ohm: a low-resistance drone-class motor, not a gimbal motor. R_total adds two DRV8316 FETs (~0.2 ohm) and must be measured with the DC hold test.",
   "provenance": {
     "pole_pairs": "datasheet",
-    "r_phase_ohm": "assumed",
+    "r_phase_ohm": "bench",
     "r_total_ohm": "assumed",
     "l_d_h": "assumed",
     "l_q_h": "assumed",
@@ -20,8 +20,8 @@
     "current_sense_mv_per_a": "datasheet"
   },
   "pole_pairs": 7,
-  "r_phase_ohm": 10.5,
-  "r_total_ohm": 10.7,
+  "r_phase_ohm": 0.15,
+  "r_total_ohm": 0.35,
   "l_d_h": 0.012,
   "l_q_h": 0.012,
   "psi_wb": 0.0095,
