@@ -25,19 +25,28 @@
 #define MODE_ENCODER 2
 #define MODE_OPENLOOP 3
 #define MODE_CURRENT 4
+#define MODE_STATIC 5
 
 #define TEST_MODE MODE_OPENLOOP
 
+// The Feather drove this motor through the same DRV8316 in 3-PWM mode, with the
+// low-side inputs held high. Keep that as a switch so the two can be compared.
+#define USE_3PWM 1
+
 // Below this the DRV8316 is not supposed to run the motor at all.
 #define SUPPLY_MIN_V 8.0f
-#define VOLTAGE_LIMIT 0.3f
+#define VOLTAGE_LIMIT 1.5f
 #define OPENLOOP_VELOCITY 5.0f  // rad/s, slow enough to see a wiring error
 #define CURRENT_TARGET_A 0.2f
 #define PRINT_PERIOD_MS 500
 
 BLDCMotor motor = BLDCMotor(MOTOR_POLE_PAIRS);
+#if USE_3PWM
+DRV8316Driver3PWM driver = DRV8316Driver3PWM(PHA_H, PHB_H, PHC_H, DRV_CS);
+#else
 DRV8316Driver6PWM driver =
     DRV8316Driver6PWM(PHA_H, PHA_L, PHB_H, PHB_L, PHC_H, PHC_L, DRV_CS, false);
+#endif
 
 SPISettings mt6701Settings(10000000, MT6701_BITORDER, SPI_MODE2);
 MagneticSensorMT6701SSI sensor = MagneticSensorMT6701SSI(ENC_CS, mt6701Settings);
@@ -68,7 +77,14 @@ static void printConfig() {
   Serial.print(" | supply ");
   Serial.print(driver.voltage_power_supply, 2);
   Serial.print(" | pwm ");
-  Serial.println((int)driver.getPWMMode());
+  Serial.print((int)driver.getPWMMode());
+  DRV8316Status drv = driver.getStatus();
+  Serial.print(" | drv_fault ");
+  Serial.print(drv.isFault() ? 1 : 0);
+  Serial.print(" | drv_spi_err ");
+  Serial.print(drv.isSPIError() ? 1 : 0);
+  Serial.print(" | Ua ");
+  Serial.println(motor.voltage.q, 3);
 }
 
 static float busVoltage() { return _readRegularADCVoltage(VSENS) * MOTOR_VBUS_SCALE; }
@@ -113,6 +129,16 @@ void setup() {
 #endif
 
   digitalWrite(DRV_CS, HIGH);
+#if USE_3PWM
+  // 3-PWM expects the low-side inputs tied high; the DRV generates the
+  // complementary signal and its own dead time.
+  pinMode(PHA_L, OUTPUT);
+  pinMode(PHB_L, OUTPUT);
+  pinMode(PHC_L, OUTPUT);
+  digitalWrite(PHA_L, HIGH);
+  digitalWrite(PHB_L, HIGH);
+  digitalWrite(PHC_L, HIGH);
+#endif
   sensor.init(&SPI_encoder);
 
 #if TEST_MODE == MODE_ENCODER
@@ -122,7 +148,9 @@ void setup() {
   driver.voltage_power_supply = busVoltage();
   driver.voltage_limit = VOLTAGE_LIMIT;
   driver.init(&SPI_driver);
+#if !USE_3PWM
   driver.setPWMMode(PWM6_Mode);
+#endif
   driver.setOCPMode(NoAction);
   driver.setCurrentSenseGain(Gain_0V375);
 
@@ -146,10 +174,21 @@ void setup() {
   motor.linkCurrentSense(&current_sense);
 
   motor.linkDriver(&driver);
-  motor.linkSensor(&sensor);
+  // Open loop must not have a sensor linked: without initFOC the direction stays
+  // UNKNOWN and the electrical angle never advances, freezing the voltage vector.
+  if (TEST_MODE == MODE_CURRENT) motor.linkSensor(&sensor);
   motor.voltage_limit = VOLTAGE_LIMIT;
   motor.velocity_limit = 20.0f;
   motor.motion_downsample = 4;
+
+  if (TEST_MODE == MODE_STATIC) {
+    if (!motor.init()) {
+      Serial.println("motor init failed");
+      return;
+    }
+    Serial.println("static vector: measure A-B with a DC voltmeter, expect ~0.5 V");
+    return;
+  }
 
   if (TEST_MODE == MODE_OPENLOOP) {
     motor.controller = MotionControlType::velocity_openloop;
@@ -225,6 +264,13 @@ void loop() {
       return;
     }
   }
+
+#if TEST_MODE == MODE_STATIC
+  // Fixed vector at electrical angle 0: phase A high, B and C low. The average
+  // phase-to-phase voltage is visible on a multimeter, unlike a rotating vector.
+  motor.setPhaseVoltage(0.5f, 0.0f, 0.0f);
+  delay(5);
+#endif
 
 #if TEST_MODE == MODE_OPENLOOP
   // No loopFOC here: open loop must not use the sensor, and loopFOC would
