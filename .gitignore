@@ -6,6 +6,9 @@
 # Generated compile database (recreated by pio run)
 compile_commands.json
 
+# Generated from hardware/motor_params.json at build time
+firmware/common/include/motor_params.h
+
 # Python
 __pycache__/
 *.py[cod]

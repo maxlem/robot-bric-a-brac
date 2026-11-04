@@ -1,0 +1,9 @@
+{
+  "name": "common",
+  "version": "0.1.0",
+  "description": "Board-agnostic definitions shared by the firmware targets: the scope packet and the generated motor parameters.",
+  "build": {
+    "srcDir": "src",
+    "includeDir": "include"
+  }
+}

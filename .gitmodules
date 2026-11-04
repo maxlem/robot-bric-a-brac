@@ -5,3 +5,7 @@
 [submodule "tools/SimpleFOCScope"]
 	path = tools/SimpleFOCScope
 	url = https://github.com/maxlem/SimpleFOCScope.git
+[submodule "third_party/Arduino-FOC-drivers"]
+	path = third_party/Arduino-FOC-drivers
+	url = https://github.com/maxlem/Arduino-FOC-drivers.git
+	branch = fix/stm32duino-timer-api
