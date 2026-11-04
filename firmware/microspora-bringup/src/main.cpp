@@ -251,7 +251,9 @@ void setup() {
     Serial.print("characterise result: ");
     Serial.println(result);
     if (result == 0) {
-      Serial.print("R phase-to-phase: ");
+      // The library stores the per-phase value the current controller needs,
+      // even though its debug message calls it phase-to-phase.
+      Serial.print("R phase: ");
       Serial.print(motor.phase_resistance, 4);
       Serial.println(" ohm");
       Serial.print("Ld: ");
