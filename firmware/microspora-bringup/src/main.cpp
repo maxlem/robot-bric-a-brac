@@ -11,6 +11,7 @@
 // generated motor_params.h, so firmware and simulation share one source.
 
 #include <Arduino.h>
+#include <string.h>
 #include <SPI.h>
 #include <SimpleFOC.h>
 #include <SimpleFOCDrivers.h>
@@ -48,6 +49,42 @@ LowsideCurrentSense current_sense =
 
 SPIClass SPI_encoder(ENC_NC, ENC_SDO, ENC_CLK);
 SPIClass SPI_driver(PB5_ALT1, PB4_ALT1, PC10);
+
+
+// Jump into the STM32 system bootloader so the host can flash without touching
+// BOOT0. The bootloader stays mapped at 0x1FFF0000 even with BOOT0 low.
+static void jumpToDfu() {
+  Serial.println("jumping to DFU");
+  Serial.flush();
+  delay(100);
+  HAL_RCC_DeInit();
+  SysTick->CTRL = 0;
+  SysTick->LOAD = 0;
+  SysTick->VAL = 0;
+  __disable_irq();
+  const uint32_t base = 0x1FFF0000;
+  __set_MSP(*reinterpret_cast<volatile uint32_t*>(base));
+  void (*entry)(void) =
+      reinterpret_cast<void (*)(void)>(*reinterpret_cast<volatile uint32_t*>(base + 4));
+  entry();
+}
+
+// One-line serial commands, available in every mode.
+static void pollCommands() {
+  static char buffer[16];
+  static uint8_t length = 0;
+  while (Serial.available()) {
+    char c = Serial.read();
+    if (c == '\n' || c == '\r') {
+      buffer[length] = 0;
+      if (strcmp(buffer, "dfu") == 0) jumpToDfu();
+      else if (length > 0) Serial.println("commands: dfu");
+      length = 0;
+    } else if (length < sizeof(buffer) - 1) {
+      buffer[length++] = c;
+    }
+  }
+}
 
 static float busVoltage() { return _readRegularADCVoltage(VSENS) * VSCALE; }
 
@@ -150,6 +187,8 @@ void setup() {
 }
 
 void loop() {
+  pollCommands();
+
 #if TEST_MODE == MODE_BLINK
   digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
   delay(500);
