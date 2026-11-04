@@ -35,7 +35,7 @@
 
 // Below this the DRV8316 is not supposed to run the motor at all.
 #define SUPPLY_MIN_V 8.0f
-#define VOLTAGE_LIMIT 1.5f
+#define VOLTAGE_LIMIT 0.5f
 #define OPENLOOP_VELOCITY 5.0f  // rad/s, slow enough to see a wiring error
 #define CURRENT_TARGET_A 0.2f
 #define PRINT_PERIOD_MS 500
@@ -273,8 +273,10 @@ void loop() {
 #endif
 
 #if TEST_MODE == MODE_OPENLOOP
-  // No loopFOC here: open loop must not use the sensor, and loopFOC would
-  // commute from a meaningless angle and freeze the voltage vector.
+  // loopFOC is required even in open loop: it turns the integrated shaft_angle
+  // into the electrical angle that move() applies. The sensor is not linked in
+  // this mode, so shaft_angle integrates freely.
+  motor.loopFOC();
   motor.move(OPENLOOP_VELOCITY);
   if (millis() - last_print >= PRINT_PERIOD_MS) {
     last_print = millis();

@@ -67,6 +67,25 @@ Set `TEST_MODE` at the top of `src/main.cpp`, rebuild, flash.
   calibrated value is **11.57**. Recorded in `hardware/motor_params.json` with
   provenance `bench`.
 
+## What prevented rotation (recorded because it cost a session)
+
+Three separate defects, each enough on its own:
+
+1. **PWM mode override.** `setup()` called `setPWMMode(PWM6_Mode)` unconditionally,
+   so a 3-PWM build reported `pwm 0` and the chip was in the wrong mode for the
+   wiring. The Feather configuration that works with this motor is 3-PWM with the
+   low-side inputs held high.
+2. **`loopFOC()` is required in open loop.** `velocityOpenloop()` only integrates
+   `shaft_angle`; the electrical angle applied by `move()` is computed in
+   `loopFOC()`. Without it the voltage vector sits at a fixed angle: constant
+   currents, a short twitch, no rotation.
+3. **Do not link the sensor in open loop.** Without `initFOC()` the direction
+   stays `UNKNOWN`, and `BLDCMotor::init()` only defaults it to CW when no sensor
+   is linked.
+
+Symptom of (2) and (3) is identical: `ia/ib/ic` constant, rotor moves a fraction
+of a turn and stops. Symptom of (1) is different: no current at all.
+
 ## Next after bring-up
 
 Run `docs/motor-identification.md` in order: current offsets and gain, inverter
