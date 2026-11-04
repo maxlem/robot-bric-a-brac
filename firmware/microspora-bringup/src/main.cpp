@@ -29,8 +29,14 @@
 #define MODE_STATIC 5
 #define MODE_IDENT_R 6
 #define MODE_CHARACTERISE 7
+#define MODE_SCOPE 8
+#define MODE_WEB 9
 
-#define TEST_MODE MODE_OPENLOOP
+#define TEST_MODE MODE_WEB
+
+// 200 Hz: 66 bytes per packet at 250000 baud is 2.6 ms, so this leaves
+// headroom and gives the scope a 0.5 s window over its last 100 samples.
+#define SCOPE_PERIOD_US 5000
 
 // The official MicroSpora firmware uses 6-PWM, and so does the DRV8316 driver
 // class by default. 3-PWM was only a workaround for the 6-PWM build that
@@ -61,6 +67,12 @@ LowsideCurrentSense current_sense =
 
 SPIClass SPI_encoder(ENC_NC, ENC_SDO, ENC_CLK);
 SPIClass SPI_driver(PB5_ALT1, PB4_ALT1, PC10);
+
+// Commander interface for the SimpleFOC WebController. The motor is registered
+// as 'M', and the monitor uses the same character as its start/end marker so
+// the browser can tell motor data from command replies.
+Commander command = Commander(Serial);
+void doMotor(char *cmd) { command.motor(&motor, cmd); }
 
 
 // Scale comes from hardware/motor_params.json, calibrated against a
@@ -234,6 +246,24 @@ void setup() {
   motor.velocity_limit = 20.0f;
   motor.motion_downsample = 4;
 
+  if (TEST_MODE == MODE_WEB) {
+    // Open loop until the encoder magnet is mounted: the WebController can
+    // change the target and the limits, but closed-loop modes need initFOC.
+    motor.controller = MotionControlType::velocity_openloop;
+    if (!motor.init()) {
+      Serial.println("motor init failed");
+      return;
+    }
+    command.add('M', doMotor, "motor");
+    motor.useMonitoring(Serial);
+    motor.monitor_start_char = 'M';
+    motor.monitor_end_char = 'M';
+    motor.monitor_downsample = 10;
+    command.verbose = VerboseMode::machine_readable;
+    Serial.println("web: commander ready, motor id M, open loop");
+    return;
+  }
+
   if (TEST_MODE == MODE_CHARACTERISE) {
     if (!motor.init()) {
       Serial.println("motor init failed");
@@ -315,11 +345,13 @@ void setup() {
 }
 
 void loop() {
+#if TEST_MODE != MODE_WEB && TEST_MODE != MODE_SCOPE
   static uint32_t last_config = 0;
   if (millis() - last_config >= 5000) {
     last_config = millis();
     printConfig();
   }
+#endif
 
 #if TEST_MODE == MODE_BLINK
   digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
@@ -409,5 +441,14 @@ void loop() {
     Serial.print(" ib ");
     Serial.println(currents.b, 3);
   }
+#endif
+
+#if TEST_MODE == MODE_WEB
+  // The WebController drives the target through the Commander and reads the
+  // monitor stream. Keep the FOC loop running at full rate.
+  motor.loopFOC();
+  motor.move();
+  motor.monitor();
+  command.run();
 #endif
 }
