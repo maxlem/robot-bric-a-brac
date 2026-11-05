@@ -13,6 +13,7 @@ record where it came from, so a dimension can always be traced back.
 |---|---|
 | Configuration | 12N14P |
 | Motor size | Φ50 × 26 mm |
+| Stator boss | **Ø25 × 10 mm** (the plate sits on its end face) |
 | Mounting face to rotor face | 21.3 mm |
 | Shaft (out) | 4 mm |
 | Shaft (in) | 5 mm |
