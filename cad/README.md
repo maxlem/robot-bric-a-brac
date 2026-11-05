@@ -58,6 +58,12 @@ cad/
 - Heat-set brass inserts: M3 for motor mounts, M2.5 for the DM5010, M2 for the
   MicroSpora.
 
+## Before printing
+
+Work through `PRINT_CHECKLIST.md` first: measurements, CAD checks, slicer
+settings, printer prep, and a post-print fit check. Do not slice until every
+measurement is confirmed.
+
 ## Conventions
 
 - Read `skeleton.py` first; never hard-code a link length in a part file.
