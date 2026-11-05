@@ -84,17 +84,20 @@ def build(cfg: DroneStand = DroneStand()) -> tuple[Part, Part]:
     # Motor plate: vertical, front face at y = -motor_plate_t / 2.
     plate_z = cfg.base_t + cfg.motor_plate_h / 2
     motor_plate = Box(cfg.motor_plate_w, cfg.motor_plate_t, cfg.motor_plate_h)
-    # Stator holes: Ø19 pair vertical, Ø16 pair horizontal.
+    # Stator holes: Ø19 pair vertical, Ø16 pair horizontal. The plate is
+    # vertical, so the holes run along Y.
     for x, z in (
         (0, cfg.motor_pitch_19 / 2),
         (0, -cfg.motor_pitch_19 / 2),
         (cfg.motor_pitch_16 / 2, 0),
         (-cfg.motor_pitch_16 / 2, 0),
     ):
-        motor_plate -= Pos(x, 0, z) * Cylinder(
+        motor_plate -= Pos(x, 0, z) * Rot(90, 0, 0) * Cylinder(
             cfg.motor_hole_d / 2, cfg.motor_plate_t + 2
         )
-    motor_plate -= Cylinder(cfg.motor_bore / 2, cfg.motor_plate_t + 2)
+    motor_plate -= Rot(90, 0, 0) * Cylinder(
+        cfg.motor_bore / 2, cfg.motor_plate_t + 2
+    )
     motor_plate = Pos(0, 0, plate_z) * motor_plate
 
     # Gussets on the back of the plate, clear of the motor.
