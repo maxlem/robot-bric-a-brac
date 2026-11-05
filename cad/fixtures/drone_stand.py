@@ -39,9 +39,10 @@ class DroneStand:
     motor_plate_h: float = 50.0
     motor_plate_t: float = 6.0
 
-    # Motor interface. TODO: confirm the bolt pattern and shaft.
-    motor_pitch_x: float = 16.0
-    motor_pitch_y: float = 19.0
+    # Motor interface: stator-side pattern 19 x 16 mm, M3.
+    # Swap x/y if the motor's cable exit needs the other orientation.
+    motor_pitch_x: float = 19.0
+    motor_pitch_y: float = 16.0
     motor_hole_d: float = 3.4  # M3 clearance
     motor_bore: float = 12.0
 
