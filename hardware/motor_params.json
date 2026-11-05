@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "status": "placeholder",
+  "motor": "4108-class gimbal, 7 pole pairs, to be measured",
+  "notes": "Phase-to-phase resistance measured 0.30/0.29/0.30 ohm with a milliohm meter, so R_phase = 0.15 ohm: a low-resistance drone-class motor, not a gimbal motor. R_total adds two DRV8316 FETs (~0.2 ohm) and must be measured with the DC hold test. The bus voltage read 5% low because the library used the shortest ADC sampling time on a 4.3k source; the library now uses 247.5 cycles, so the divider ratio is the datasheet 11.0 again. characteriseMotor returned 0 (current sense usable) and measured R=0.153 ohm, Ld=37.6 uH, Lq=48.1 uH. The 12 mH inductance placeholder was ~300x too high. A second characteriseMotor run from the WebController gave R=0.14321 ohm, Lq=30 uH, Ld=20 uH; the first gave 0.153 ohm, 48.1/37.6 uH. Inductance is position-dependent, so treat L as tens of uH rather than an exact value.",
+  "provenance": {
+    "pole_pairs": "datasheet",
+    "r_phase_ohm": "bench",
+    "r_total_ohm": "assumed",
+    "l_d_h": "characteriseMotor",
+    "l_q_h": "characteriseMotor",
+    "psi_wb": "assumed",
+    "kt_nm_per_a": "assumed",
+    "j_rotor_kgm2": "assumed",
+    "b_nms": "assumed",
+    "tc_nm": "assumed",
+    "v_dead_v": "assumed",
+    "current_offset_a": "assumed",
+    "vbus_scale": "datasheet (4.7k/47k); ADC sampling time fixed in the library",
+    "current_sense_mv_per_a": "datasheet",
+    "r_characterise_ohm": "characteriseMotor"
+  },
+  "pole_pairs": 7,
+  "r_phase_ohm": 0.15,
+  "r_total_ohm": 0.35,
+  "l_d_h": 2e-05,
+  "l_q_h": 3e-05,
+  "psi_wb": 0.0095,
+  "kt_nm_per_a": 0.0998,
+  "j_rotor_kgm2": 4e-05,
+  "b_nms": 1e-05,
+  "tc_nm": 0.002,
+  "v_dead_v": 0.35,
+  "current_offset_a": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "vbus_scale": 11.0,
+  "current_sense_mv_per_a": 375.0,
+  "r_characterise_ohm": 0.14321
+}

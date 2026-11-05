@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CAD viewer</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="app">
+      <aside id="sidebar">
+        <header>
+          <h1>CAD</h1>
+          <span id="conn" class="conn" title="live connection">&#9679;</span>
+        </header>
+        <div id="summary" class="summary">waiting for the first build&hellip;</div>
+        <ul id="parts"></ul>
+        <footer>
+          <button id="rebuild">Rebuild</button>
+          <label class="toggle">
+            <input type="checkbox" id="wireframe" />
+            wireframe
+          </label>
+        </footer>
+      </aside>
+      <main id="stage">
+        <canvas id="view"></canvas>
+        <div id="hud"></div>
+        <div id="error" class="error hidden">
+          <button id="error-close" title="close">&times;</button>
+          <pre id="error-text"></pre>
+        </div>
+      </main>
+    </div>
+    <script type="module" src="/static/app.js"></script>
+  </body>
+</html>
