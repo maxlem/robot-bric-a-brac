@@ -31,7 +31,7 @@ class Motor5010:
     bell_h: float = 8.3  # 10 + 3 + 8.3 = 21.3 mm to the rotor face
     shaft_d: float = 4.0
     shaft_l: float = 4.7  # front stub
-    through_shaft_l: float = 10.0  # behind the mounting face
+    through_shaft_l: float = 3.0  # behind the mounting face
     stator_pitch_19: float = 19.0  # vertical pair
     stator_pitch_16: float = 16.0  # horizontal pair
     stator_hole_d: float = 3.0

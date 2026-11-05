@@ -56,7 +56,7 @@ class DroneStand:
     microspora_hole_d: float = 2.4  # M2 clearance
     microspora_offset_x: float = 0.0
     microspora_offset_y: float = 0.0
-    microspora_recess_d: float = 1.8  # 1.6 mm PCB + 0.2 mm
+    microspora_recess_d: float = 1.5  # component clearance
 
     # Rotor-side encoder: AS5048A on a front bracket.
     as5048a_plate_w: float = 40.0
@@ -177,15 +177,15 @@ def build(cfg: DroneStand = DroneStand()) -> tuple[Part, Part, Part]:
     carrier = Rot(90, 0, 0) * carrier
     carrier = Pos(0, rotor_y - cfg.carrier_t / 2, plate_z) * carrier
 
-    # Stator-side magnet holder: sits on the through-shaft behind the plate,
-    # magnet on the front face, facing the MicroSpora.
+    # Stator-side magnet holder: sits on the through-shaft inside the plate's
+    # central hole, magnet on the back face, facing the MicroSpora.
     holder = Cylinder(cfg.holder_d / 2, cfg.holder_t)
     holder -= Cylinder(cfg.shaft_d / 2, cfg.holder_t + 2)
     holder -= Pos(0, 0, cfg.holder_t / 2 - cfg.magnet_t / 2 + 0.5) * Cylinder(
         cfg.magnet_d / 2, cfg.magnet_t + 1
     )
     holder = Rot(90, 0, 0) * holder
-    holder = Pos(0, cfg.motor_plate_t / 2 + 1.5 + cfg.holder_t / 2, plate_z) * holder
+    holder = Pos(0, -1.25, plate_z) * holder
 
     return stand, carrier, holder
 
@@ -203,7 +203,7 @@ def sensor_board_microspora(cfg: DroneStand = DroneStand()) -> Part:
     board = Box(cfg.microspora_w, 1.6, cfg.microspora_h)
     chip = Box(3.0, 0.8, 3.0)
     board += Pos(
-        cfg.microspora_offset_x, 0.8 + 0.4, cfg.microspora_offset_y
+        cfg.microspora_offset_x, -0.8 - 0.4, cfg.microspora_offset_y
     ) * chip
     return board
 
@@ -228,14 +228,12 @@ def assembly_parts(
     ]
 
     if sensor == "microspora":
-        # Board in the recess on the back of the plate, magnet on the holder
-        # behind it.
+        # Board in the recess on the back of the plate, magnet in the plate's
+        # central hole in front of it.
         board_y = (
-            cfg.motor_plate_t / 2 - cfg.microspora_recess_d + 0.2 + 0.8
+            cfg.motor_plate_t / 2 - cfg.microspora_recess_d + 0.8
         )
-        magnet_y = (
-            cfg.motor_plate_t / 2 + 1.5 + cfg.magnet_actual_t / 2
-        )
+        magnet_y = -cfg.magnet_actual_t / 2
         parts += [
             ("holder", holder, "#7fc8a0"),
             ("magnet", Pos(0, magnet_y, plate_z) * magnet(cfg), "#c080d0"),
