@@ -26,13 +26,13 @@ class Motor5010:
     stator_d: float = 50.0
     flange_t: float = 3.0
     bell_d: float = 52.0
-    bell_h: float = 23.0  # overall length 26 mm with the flange
+    bell_h: float = 18.3  # mounting face to rotor face is 21.3 mm
     shaft_d: float = 4.0
-    shaft_l: float = 4.0
-    stator_pitch_x: float = 19.0
-    stator_pitch_y: float = 16.0
+    shaft_l: float = 4.7  # 26 mm overall
+    stator_pitch_19: float = 19.0  # vertical pair
+    stator_pitch_16: float = 16.0  # horizontal pair
     stator_hole_d: float = 3.0
-    rotor_pitch: float = 12.0
+    rotor_pitch: float = 12.0  # bolt circle
     rotor_hole_d: float = 2.0
 
     @property
@@ -54,20 +54,29 @@ def build(cfg: Motor5010 = Motor5010()) -> Part:
 
     motor = flange + bell
 
-    # Stator mounting holes, through the flange.
-    for x in (-cfg.stator_pitch_x / 2, cfg.stator_pitch_x / 2):
-        for z in (-cfg.stator_pitch_y / 2, cfg.stator_pitch_y / 2):
-            motor -= Pos(x, -cfg.flange_t / 2, z) * Rot(90, 0, 0) * Cylinder(
-                cfg.stator_hole_d / 2, cfg.flange_t + 2
-            )
+    # Stator mounting holes: 2 on the Ø19 circle (vertical) and 2 on the
+    # Ø16 circle (horizontal).
+    for x, z in (
+        (0, cfg.stator_pitch_19 / 2),
+        (0, -cfg.stator_pitch_19 / 2),
+        (cfg.stator_pitch_16 / 2, 0),
+        (-cfg.stator_pitch_16 / 2, 0),
+    ):
+        motor -= Pos(x, -cfg.flange_t / 2, z) * Rot(90, 0, 0) * Cylinder(
+            cfg.stator_hole_d / 2, cfg.flange_t + 2
+        )
 
-    # Rotor face holes, into the front of the bell.
+    # Rotor face holes: 4 on a Ø12 bolt circle.
     rotor_y = -cfg.flange_t - cfg.bell_h
-    for x in (-cfg.rotor_pitch / 2, cfg.rotor_pitch / 2):
-        for z in (-cfg.rotor_pitch / 2, cfg.rotor_pitch / 2):
-            motor -= Pos(x, rotor_y + 2, z) * Rot(90, 0, 0) * Cylinder(
-                cfg.rotor_hole_d / 2, 4
-            )
+    for x, z in (
+        (0, cfg.rotor_pitch / 2),
+        (0, -cfg.rotor_pitch / 2),
+        (cfg.rotor_pitch / 2, 0),
+        (-cfg.rotor_pitch / 2, 0),
+    ):
+        motor -= Pos(x, rotor_y + 2, z) * Rot(90, 0, 0) * Cylinder(
+            cfg.rotor_hole_d / 2, 4
+        )
 
     # Shaft stub, ending inside the magnet carrier.
     motor += Pos(0, rotor_y - cfg.shaft_l / 2, 0) * Rot(90, 0, 0) * Cylinder(

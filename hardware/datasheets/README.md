@@ -13,11 +13,13 @@ record where it came from, so a dimension can always be traced back.
 |---|---|
 | Configuration | 12N14P |
 | Motor size | Φ50 × 26 mm |
+| Mounting face to rotor face | 21.3 mm |
 | Shaft (out) | 4 mm |
 | Shaft (in) | 5 mm |
 | Weight | 92 g |
-| Mounting | rear threaded holes, 16 mm and 19 mm spacings |
+| Stator holes | 4 × M3: Ø19 pair (vertical) + Ø16 pair (horizontal) |
+| Rotor holes | 4 × M3 on a Ø12 bolt circle |
 | Cable | 40 cm |
 
-The CAD model in `cad/fixtures/motor_5010.py` uses the 26 mm overall length,
-the 19 × 16 mm stator pattern, and the 12 × 12 mm rotor pattern.
+The CAD model in `cad/fixtures/motor_5010.py` uses the 21.3 mm mounting face
+to rotor face, the Ø19/Ø16 stator cross, and the Ø12 rotor circle.
