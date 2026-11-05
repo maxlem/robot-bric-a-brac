@@ -20,6 +20,7 @@ OUT = CAD / "build" / "viewer"
 
 # Every module that exposes parts() -> dict[str, Part].
 MODULES = [
+    "fixtures.motor_5010",
     "fixtures.drone_stand",
     "fixtures.dm5010_mount",
 ]
