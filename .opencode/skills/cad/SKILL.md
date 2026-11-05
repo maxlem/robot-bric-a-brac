@@ -82,6 +82,9 @@ cad/.venv/bin/python cad/viewer/server.py --open
 - A fixture can also expose
   `assemblies() -> dict[str, list[tuple[str, Part, str]]]` to show positioned
   components together, each with a colour.
+- For images, see the `cad-screenshot` skill: `viewer/views.py` (front/top/left
+  with dimensions), `viewer/render.py` (3D), and `viewer/shots.sh` (headless
+  browser).
 - The build runs in a long-lived worker (`viewer/worker.py`) that imports
   build123d once, so a rebuild is about a second.
 - A build error is shown as a traceback in the page, not a crash.

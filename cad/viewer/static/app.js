@@ -11,6 +11,9 @@ const summary = document.getElementById("summary");
 const conn = document.getElementById("conn");
 const wireframe = document.getElementById("wireframe");
 
+const params = new URLSearchParams(location.search);
+if (params.get("wireframe") === "1") wireframe.checked = true;
+
 // --- scene ---------------------------------------------------------------
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -287,6 +290,18 @@ function applyState(next) {
         : null;
   }
 
+  // ?select=<name> pins the view, for screenshots.
+  const requested = params.get("select");
+  if (requested) {
+    const part = state.parts.find((p) => p.name === requested);
+    const assembly = (state.assemblies || []).find((p) => p.name === requested);
+    if (part && part.status === "ok") {
+      current = { type: "part", name: requested };
+    } else if (assembly && assembly.status === "ok") {
+      current = { type: "assembly", name: requested };
+    }
+  }
+
   renderSidebar();
 
   const errors = all.filter((p) => p.status === "error");
@@ -307,6 +322,14 @@ function applyState(next) {
 }
 
 function connect() {
+  // ?static=1 loads the state once, for headless screenshots.
+  if (params.get("static") === "1") {
+    fetch("/api/state")
+      .then((response) => response.json())
+      .then(applyState);
+    return;
+  }
+
   const events = new EventSource("/api/events");
 
   events.addEventListener("state", (event) => {

@@ -55,13 +55,19 @@ restart.
 ## Renders
 
 ```sh
-cd cad && .venv/bin/python -m viewer.render
+cd cad && .venv/bin/python -m viewer.render   # 3D parts and assemblies
+cd cad && .venv/bin/python -m viewer.views    # front/top/left with dimensions
 ```
 
-Writes hidden-line PNGs of every part and ghosted wireframes of every
-assembly to `cad/build/viewer/renders/`. Colour code: printed parts
-blue-grey, motor orange, magnet holders green, magnets purple, sensor
-boards red.
+`render` writes hidden-line PNGs of every part and ghosted wireframes of every
+assembly to `cad/build/viewer/renders/`. `views` writes one PNG per part with
+front, top, and left projections, a bounding box, and the X/Y/Z dimensions to
+`cad/build/viewer/views/`, plus a Markdown index.
+
+Colour code: printed parts blue-grey, motor orange, magnet holders green,
+magnets purple, sensor boards red.
+
+For live-viewer screenshots, run `cad/viewer/shots.sh` (headless Chrome).
 
 ## Layout
 
