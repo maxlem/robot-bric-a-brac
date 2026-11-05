@@ -19,7 +19,8 @@ renderer.setClearColor(0x0e1116);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 10000);
-camera.position.set(90, 70, 110);
+camera.up.set(0, 0, 1); // CAD is Z-up
+camera.position.set(90, -110, 70);
 
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
@@ -36,28 +37,71 @@ fill.position.set(-90, 40, -70);
 scene.add(fill);
 
 const grid = new THREE.GridHelper(200, 20, 0x2b3240, 0x1a1f27);
+grid.rotation.x = Math.PI / 2; // lie in the XY plane
 grid.material.transparent = true;
 grid.material.opacity = 0.7;
 scene.add(grid);
-scene.add(new THREE.AxesHelper(30));
+
+const axes = new THREE.AxesHelper(30);
+scene.add(axes);
 
 const group = new THREE.Group();
 scene.add(group);
 
 const loader = new STLLoader();
-let mesh = null;
-let currentName = null;
+let loaded = [];
+let current = null;
 let lastBuiltAt = 0;
-let state = { parts: [], duration_ms: 0, built_at: 0 };
+let loadGeneration = 0;
+let state = { parts: [], assemblies: [], duration_ms: 0, built_at: 0 };
 
-// --- mesh ----------------------------------------------------------------
+// --- scene management ----------------------------------------------------
 
-function fitCamera(geometry) {
-  geometry.computeBoundingSphere();
-  const radius = geometry.boundingSphere?.radius || 50;
+function clearScene() {
+  for (const mesh of loaded) {
+    group.remove(mesh);
+    mesh.geometry.dispose();
+    mesh.material.dispose();
+  }
+  loaded = [];
+  group.position.set(0, 0, 0);
+}
+
+function makeMaterial(color) {
+  return new THREE.MeshStandardMaterial({
+    color: new THREE.Color(color || "#9fb4d0"),
+    metalness: 0.15,
+    roughness: 0.55,
+    wireframe: wireframe.checked,
+  });
+}
+
+function addMesh(geometry, color) {
+  geometry.computeVertexNormals();
+  const mesh = new THREE.Mesh(geometry, makeMaterial(color));
+  group.add(mesh);
+  loaded.push(mesh);
+  return mesh;
+}
+
+function fitScene(geometries) {
+  const box = new THREE.Box3();
+  for (const geometry of geometries) {
+    geometry.computeBoundingBox();
+    box.union(geometry.boundingBox);
+  }
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const radius = Math.max(size.length() / 2, 1);
+
+  // Centre the whole scene, not each component.
+  group.position.set(-center.x, -center.y, -center.z);
+  grid.position.set(0, 0, -size.z / 2);
+  axes.position.set(0, 0, -size.z / 2);
+
   const distance =
     (radius / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2))) * 1.15;
-  const direction = new THREE.Vector3(1, 0.75, 1.2).normalize();
+  const direction = new THREE.Vector3(1, -1.2, 0.8).normalize();
   camera.position.copy(direction.multiplyScalar(distance));
   camera.near = Math.max(0.1, distance / 100);
   camera.far = distance * 20;
@@ -66,86 +110,133 @@ function fitCamera(geometry) {
   controls.update();
 }
 
-function loadPart(name) {
-  const part = state.parts.find((p) => p.name === name);
-  if (!part || part.status !== "ok") return;
+// --- loading -------------------------------------------------------------
 
+function loadPart(part) {
+  const generation = ++loadGeneration;
+  clearScene();
   loader.load(
     `${part.mesh}?t=${Date.now()}`,
     (geometry) => {
-      geometry.computeVertexNormals();
-      geometry.center();
-
-      if (mesh) {
-        group.remove(mesh);
-        mesh.geometry.dispose();
-        mesh.material.dispose();
-      }
-
-      const material = new THREE.MeshStandardMaterial({
-        color: 0x9fb4d0,
-        metalness: 0.15,
-        roughness: 0.55,
-        wireframe: wireframe.checked,
-      });
-      mesh = new THREE.Mesh(geometry, material);
-      group.add(mesh);
-
-      fitCamera(geometry);
+      if (generation !== loadGeneration) return;
+      addMesh(geometry, part.color);
+      fitScene([geometry]);
       updateHud(part);
     },
     undefined,
-    (err) => showError(`Could not load ${name}\n\n${err}`),
+    (err) => showError(`Could not load ${part.name}\n\n${err}`),
   );
 }
 
-function updateHud(part) {
-  const bbox = part.bbox.map((v) => v.toFixed(1)).join(" × ");
+function loadAssembly(assembly) {
+  const generation = ++loadGeneration;
+  clearScene();
+  const geometries = [];
+  const components = assembly.components.filter((c) => c.status === "ok");
+  if (!components.length) return;
+
+  let pending = components.length;
+  for (const component of components) {
+    loader.load(
+      `${component.mesh}?t=${Date.now()}`,
+      (geometry) => {
+        if (generation !== loadGeneration) return;
+        addMesh(geometry, component.color);
+        geometries.push(geometry);
+        if (--pending === 0) {
+          fitScene(geometries);
+          updateHud(assembly);
+        }
+      },
+      undefined,
+      (err) => showError(`Could not load ${component.name}\n\n${err}`),
+    );
+  }
+}
+
+// --- hud -----------------------------------------------------------------
+
+function updateHud(item) {
+  if (item.components) {
+    const ok = item.components.filter((c) => c.status === "ok").length;
+    hud.innerHTML = `
+      <strong>${item.name}</strong>
+      <span>${ok} components</span>
+      <span>${item.bbox.map((v) => v.toFixed(1)).join(" × ")} mm</span>
+      <span>${item.duration_ms.toFixed(0)} ms</span>`;
+    return;
+  }
+  const bbox = item.bbox.map((v) => v.toFixed(1)).join(" × ");
   hud.innerHTML = `
-    <strong>${part.name}</strong>
-    <span>${part.volume_mm3.toLocaleString()} mm³</span>
+    <strong>${item.name}</strong>
+    <span>${item.volume_mm3.toLocaleString()} mm³</span>
     <span>${bbox} mm</span>
-    <span>${part.triangles.toLocaleString()} tris</span>
-    <span>${part.duration_ms.toFixed(0)} ms</span>`;
+    <span>${item.triangles.toLocaleString()} tris</span>
+    <span>${item.duration_ms.toFixed(0)} ms</span>`;
 }
 
 // --- sidebar -------------------------------------------------------------
 
+function findItem(selection) {
+  const list =
+    selection.type === "part" ? state.parts : state.assemblies || [];
+  return list.find((item) => item.name === selection.name);
+}
+
+function isActive(type, name) {
+  return current && current.type === type && current.name === name;
+}
+
 function renderSidebar() {
   partsList.innerHTML = "";
 
-  for (const part of state.parts) {
-    const li = document.createElement("li");
-    li.className = "part" + (part.name === currentName ? " active" : "");
-    li.dataset.status = part.status;
+  const addSection = (title, items, type) => {
+    if (!items.length) return;
+    const header = document.createElement("li");
+    header.className = "section";
+    header.textContent = title;
+    partsList.appendChild(header);
 
-    const meta =
-      part.status === "ok"
-        ? `${part.volume_mm3.toLocaleString()} mm³ · ${part.duration_ms.toFixed(0)} ms`
-        : "build failed";
+    for (const item of items) {
+      const li = document.createElement("li");
+      li.className = "part" + (isActive(type, item.name) ? " active" : "");
+      li.dataset.status = item.status;
 
-    li.innerHTML = `
-      <span class="dot"></span>
-      <span class="name"></span>
-      <span class="meta"></span>`;
-    li.querySelector(".name").textContent = part.name;
-    li.querySelector(".meta").textContent = meta;
+      const meta =
+        item.status === "ok"
+          ? type === "assembly"
+            ? `${item.components.length} components · ${item.duration_ms.toFixed(0)} ms`
+            : `${item.volume_mm3.toLocaleString()} mm³ · ${item.duration_ms.toFixed(0)} ms`
+          : "build failed";
 
-    li.addEventListener("click", () => {
-      if (part.status === "ok") {
-        currentName = part.name;
+      li.innerHTML = `
+        <span class="dot"></span>
+        <span class="name"></span>
+        <span class="meta"></span>`;
+      li.querySelector(".name").textContent = item.name;
+      li.querySelector(".meta").textContent = meta;
+
+      li.addEventListener("click", () => {
+        if (item.status !== "ok") {
+          showError(`${item.name}\n\n${item.error || "build failed"}`);
+          return;
+        }
+        current = { type, name: item.name };
         renderSidebar();
-        loadPart(part.name);
-      } else {
-        showError(`${part.name}\n\n${part.error || "build failed"}`);
-      }
-    });
+        if (type === "part") loadPart(item);
+        else loadAssembly(item);
+      });
 
-    partsList.appendChild(li);
-  }
+      partsList.appendChild(li);
+    }
+  };
 
-  const ok = state.parts.filter((p) => p.status === "ok").length;
-  const bad = state.parts.length - ok;
+  addSection("Assemblies", state.assemblies || [], "assembly");
+  addSection("Parts", state.parts, "part");
+
+  const all = [...state.parts, ...(state.assemblies || [])];
+  const ok = all.filter((p) => p.status === "ok").length;
+  const bad = all.length - ok;
   const when = state.built_at
     ? new Date(state.built_at * 1000).toLocaleTimeString()
     : "—";
@@ -153,7 +244,7 @@ function renderSidebar() {
   summary.innerHTML =
     `<span class="${bad ? "bad" : "good"}">` +
     `${bad ? `${bad} failed` : "all ok"}</span>` +
-    ` · ${ok} part${ok === 1 ? "" : "s"}` +
+    ` · ${ok} item${ok === 1 ? "" : "s"}` +
     ` · ${state.duration_ms.toFixed(0)} ms · ${when}`;
 }
 
@@ -175,23 +266,36 @@ document.getElementById("error-close").addEventListener("click", hideError);
 function applyState(next) {
   state = next;
 
-  const ok = state.parts.filter((p) => p.status === "ok");
-  if (!ok.some((p) => p.name === currentName)) {
-    currentName = ok.length ? ok[0].name : null;
+  const all = [...state.parts, ...(state.assemblies || [])];
+  const ok = all.filter((p) => p.status === "ok");
+  if (!current || !ok.some((p) => p.name === current.name)) {
+    const firstAssembly = (state.assemblies || []).find(
+      (p) => p.status === "ok",
+    );
+    const firstPart = state.parts.find((p) => p.status === "ok");
+    current = firstAssembly
+      ? { type: "assembly", name: firstAssembly.name }
+      : firstPart
+        ? { type: "part", name: firstPart.name }
+        : null;
   }
 
   renderSidebar();
 
-  const errors = state.parts.filter((p) => p.status === "error");
+  const errors = all.filter((p) => p.status === "error");
   if (errors.length) {
     showError(errors.map((e) => `${e.name}\n\n${e.error}`).join("\n\n"));
   } else {
     hideError();
   }
 
-  if (currentName && state.built_at !== lastBuiltAt) {
+  if (current && state.built_at !== lastBuiltAt) {
     lastBuiltAt = state.built_at;
-    loadPart(currentName);
+    const item = findItem(current);
+    if (item) {
+      if (current.type === "part") loadPart(item);
+      else loadAssembly(item);
+    }
   }
 }
 
@@ -214,7 +318,7 @@ document.getElementById("rebuild").addEventListener("click", () => {
 });
 
 wireframe.addEventListener("change", () => {
-  if (mesh) mesh.material.wireframe = wireframe.checked;
+  for (const mesh of loaded) mesh.material.wireframe = wireframe.checked;
 });
 
 // --- loop ----------------------------------------------------------------

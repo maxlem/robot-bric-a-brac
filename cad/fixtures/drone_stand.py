@@ -142,19 +142,27 @@ def sensor_board(cfg: DroneStand = DroneStand()) -> Part:
     return board
 
 
-def assembly(cfg: DroneStand = DroneStand()) -> Part:
-    """Stand + motor + carrier + sensor board, in their working positions."""
+def assembly_parts(cfg: DroneStand = DroneStand()) -> list[tuple[str, Part, str]]:
+    """Stand, motor, carrier, and sensor board, in their working positions."""
     stand, carrier = build(cfg)
     plate_z = cfg.base_t + cfg.motor_plate_h / 2
 
-    motor = motor_5010.build()
-    motor = Pos(0, -cfg.motor_plate_t / 2, plate_z) * motor
+    motor = Pos(0, -cfg.motor_plate_t / 2, plate_z) * motor_5010.build()
 
     rotor_y = -cfg.motor_plate_t / 2 - cfg.motor_height
     sensor_face = rotor_y - cfg.carrier_t - cfg.sensor_gap
     board = Pos(0, sensor_face - 0.8, plate_z) * sensor_board(cfg)
 
-    return stand + motor + carrier + board
+    return [
+        ("stand", stand, "#8fa8c8"),
+        ("motor", motor, "#e0a060"),
+        ("carrier", carrier, "#7fc8a0"),
+        ("sensor", board, "#d07070"),
+    ]
+
+
+def assemblies() -> dict[str, list[tuple[str, Part, str]]]:
+    return {"drone_stand_assembly": assembly_parts()}
 
 
 def parts() -> dict[str, Part]:
@@ -163,7 +171,7 @@ def parts() -> dict[str, Part]:
     return {
         "drone_stand": stand,
         "drone_magnet_carrier": carrier,
-        "drone_stand_assembly": assembly(),
+        "drone_sensor_board": sensor_board(),
     }
 
 
