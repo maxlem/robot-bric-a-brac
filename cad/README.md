@@ -52,6 +52,17 @@ rebuild is about a second. The page loads three.js from a CDN, so the first
 load needs network access. Changes to `cad/viewer/` itself need a server
 restart.
 
+## Renders
+
+```sh
+cd cad && .venv/bin/python -m viewer.render
+```
+
+Writes hidden-line PNGs of every part and ghosted wireframes of every
+assembly to `cad/build/viewer/renders/`. Colour code: printed parts
+blue-grey, motor orange, magnet holders green, magnets purple, sensor
+boards red.
+
 ## Layout
 
 ```text
