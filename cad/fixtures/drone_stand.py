@@ -130,10 +130,15 @@ def build(cfg: DroneStand = DroneStand()) -> tuple[Part, Part]:
     return stand, carrier
 
 
-def main() -> None:
+def parts() -> dict[str, Part]:
+    """Named parts, for the viewer and the exporter."""
     stand, carrier = build()
-    export(stand, "drone_stand")
-    export(carrier, "drone_magnet_carrier")
+    return {"drone_stand": stand, "drone_magnet_carrier": carrier}
+
+
+def main() -> None:
+    for name, part in parts().items():
+        export(part, name)
 
 
 if __name__ == "__main__":

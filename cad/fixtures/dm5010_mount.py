@@ -106,10 +106,15 @@ def build(cfg: DM5010Mount = DM5010Mount()) -> tuple[Part, Part]:
     return mount, carrier
 
 
-def main() -> None:
+def parts() -> dict[str, Part]:
+    """Named parts, for the viewer and the exporter."""
     mount, carrier = build()
-    export(mount, "dm5010_mount")
-    export(carrier, "dm5010_magnet_carrier")
+    return {"dm5010_mount": mount, "dm5010_magnet_carrier": carrier}
+
+
+def main() -> None:
+    for name, part in parts().items():
+        export(part, name)
 
 
 if __name__ == "__main__":

@@ -68,6 +68,21 @@ advantage at the foot.
 - Poppy Project — 3D-printed humanoid.
 - Pupper V3 — 3D-printed quadruped brackets.
 
+## Live viewer
+
+`cad/viewer/server.py` serves a local three.js page that rebuilds on save and
+shows each part's status, volume, bounding box, and build time.
+
+```sh
+cad/.venv/bin/python cad/viewer/server.py --open
+```
+
+- Every fixture exposes `parts() -> dict[str, Part]`; add new fixtures to
+  `MODULES` in `cad/viewer/buildlib.py`.
+- The build runs in a long-lived worker (`viewer/worker.py`) that imports
+  build123d once, so a rebuild is about a second.
+- A build error is shown as a traceback in the page, not a crash.
+
 ## Rules
 
 - Read `cad/skeleton.py` first; never hard-code a link length in a part file.
