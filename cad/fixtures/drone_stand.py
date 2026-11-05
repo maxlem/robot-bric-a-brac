@@ -22,12 +22,14 @@ from export import export  # noqa: E402
 
 @dataclass(frozen=True)
 class DroneStand:
-    # Base.
-    base_w: float = 80.0
-    base_d: float = 60.0
+    # Base: the table mount. A clamp slot plus four screw holes.
+    base_w: float = 100.0
+    base_d: float = 70.0
     base_t: float = 6.0
     clamp_slot_w: float = 20.0
     clamp_slot_d: float = 8.0
+    table_screw_d: float = 4.5  # M4 clearance
+    table_screw_inset: float = 8.0
 
     # Riser and motor plate.
     riser_w: float = 20.0
@@ -59,11 +61,18 @@ class DroneStand:
 
 
 def build(cfg: DroneStand = DroneStand()) -> tuple[Part, Part]:
-    # Base with a clamp slot.
+    # Base: clamp slot plus four table screws.
     base = Pos(0, 0, cfg.base_t / 2) * Box(cfg.base_w, cfg.base_d, cfg.base_t)
     base -= Pos(0, -cfg.base_d / 2 + 10, cfg.base_t / 2) * Box(
         cfg.clamp_slot_w, cfg.clamp_slot_d, cfg.base_t + 2
     )
+    sx = cfg.base_w / 2 - cfg.table_screw_inset
+    sy = cfg.base_d / 2 - cfg.table_screw_inset
+    for x in (-sx, sx):
+        for y in (-sy, sy):
+            base -= Pos(x, y, cfg.base_t / 2) * Cylinder(
+                cfg.table_screw_d / 2, cfg.base_t + 2
+            )
 
     # Riser at the back.
     riser_y = cfg.base_d / 2 - cfg.riser_d / 2
