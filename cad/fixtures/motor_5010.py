@@ -23,10 +23,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 @dataclass(frozen=True)
 class Motor5010:
+    boss_d: float = 25.0
+    boss_h: float = 10.0
     stator_d: float = 50.0
     flange_t: float = 3.0
     bell_d: float = 52.0
-    bell_h: float = 18.3  # mounting face to rotor face is 21.3 mm
+    bell_h: float = 8.3  # 10 + 3 + 8.3 = 21.3 mm to the rotor face
     shaft_d: float = 4.0
     shaft_l: float = 4.7  # 26 mm overall
     stator_pitch_19: float = 19.0  # vertical pair
@@ -38,36 +40,41 @@ class Motor5010:
     @property
     def height(self) -> float:
         """Mounting face to rotor face."""
-        return self.flange_t + self.bell_h
+        return self.boss_h + self.flange_t + self.bell_h
 
 
 def build(cfg: Motor5010 = Motor5010()) -> Part:
-    # Mounting flange, y = -flange_t .. 0.
-    flange = Pos(0, -cfg.flange_t / 2, 0) * Rot(90, 0, 0) * Cylinder(
+    # Stator boss, y = -boss_h .. 0. The plate sits on its end face.
+    boss = Pos(0, -cfg.boss_h / 2, 0) * Rot(90, 0, 0) * Cylinder(
+        cfg.boss_d / 2, cfg.boss_h
+    )
+
+    # Mounting flange, y = -boss_h - flange_t .. -boss_h.
+    flange = Pos(0, -cfg.boss_h - cfg.flange_t / 2, 0) * Rot(90, 0, 0) * Cylinder(
         cfg.stator_d / 2, cfg.flange_t
     )
 
-    # Rotor bell, y = -flange_t - bell_h .. -flange_t.
-    bell = Pos(0, -cfg.flange_t - cfg.bell_h / 2, 0) * Rot(90, 0, 0) * Cylinder(
-        cfg.bell_d / 2, cfg.bell_h
-    )
+    # Rotor bell, y = -boss_h - flange_t - bell_h .. -boss_h - flange_t.
+    bell = Pos(
+        0, -cfg.boss_h - cfg.flange_t - cfg.bell_h / 2, 0
+    ) * Rot(90, 0, 0) * Cylinder(cfg.bell_d / 2, cfg.bell_h)
 
-    motor = flange + bell
+    motor = boss + flange + bell
 
     # Stator mounting holes: 2 on the Ø19 circle (vertical) and 2 on the
-    # Ø16 circle (horizontal).
+    # Ø16 circle (horizontal), blind into the boss.
     for x, z in (
         (0, cfg.stator_pitch_19 / 2),
         (0, -cfg.stator_pitch_19 / 2),
         (cfg.stator_pitch_16 / 2, 0),
         (-cfg.stator_pitch_16 / 2, 0),
     ):
-        motor -= Pos(x, -cfg.flange_t / 2, z) * Rot(90, 0, 0) * Cylinder(
-            cfg.stator_hole_d / 2, cfg.flange_t + 2
+        motor -= Pos(x, -4, z) * Rot(90, 0, 0) * Cylinder(
+            cfg.stator_hole_d / 2, 8
         )
 
     # Rotor face holes: 4 on a Ø12 bolt circle.
-    rotor_y = -cfg.flange_t - cfg.bell_h
+    rotor_y = -cfg.boss_h - cfg.flange_t - cfg.bell_h
     for x, z in (
         (0, cfg.rotor_pitch / 2),
         (0, -cfg.rotor_pitch / 2),
