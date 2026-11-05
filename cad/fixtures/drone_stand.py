@@ -39,8 +39,8 @@ class DroneStand:
     motor_plate_w: float = 50.0
     motor_plate_h: float = 50.0
     motor_plate_t: float = 6.0
-    motor_pitch_x: float = 19.0
-    motor_pitch_y: float = 16.0
+    motor_pitch_19: float = 19.0  # vertical pair
+    motor_pitch_16: float = 16.0  # horizontal pair
     motor_hole_d: float = 3.4  # M3 clearance
     motor_bore: float = 12.0  # cable pass-through
 
@@ -63,8 +63,8 @@ class DroneStand:
     magnet_t: float = 2.25  # 2.15 mm magnet + 0.1 mm
     shaft_d: float = 4.0
 
-    # Motor envelope: mounting face to rotor face (5010 is 26 mm overall).
-    motor_height: float = 26.0
+    # Motor envelope: mounting face to rotor face (21.3 mm on the drawing).
+    motor_height: float = 21.3
 
 
 def build(cfg: DroneStand = DroneStand()) -> tuple[Part, Part]:
@@ -84,11 +84,16 @@ def build(cfg: DroneStand = DroneStand()) -> tuple[Part, Part]:
     # Motor plate: vertical, front face at y = -motor_plate_t / 2.
     plate_z = cfg.base_t + cfg.motor_plate_h / 2
     motor_plate = Box(cfg.motor_plate_w, cfg.motor_plate_t, cfg.motor_plate_h)
-    for x in (-cfg.motor_pitch_x / 2, cfg.motor_pitch_x / 2):
-        for z in (-cfg.motor_pitch_y / 2, cfg.motor_pitch_y / 2):
-            motor_plate -= Pos(x, 0, z) * Cylinder(
-                cfg.motor_hole_d / 2, cfg.motor_plate_t + 2
-            )
+    # Stator holes: Ø19 pair vertical, Ø16 pair horizontal.
+    for x, z in (
+        (0, cfg.motor_pitch_19 / 2),
+        (0, -cfg.motor_pitch_19 / 2),
+        (cfg.motor_pitch_16 / 2, 0),
+        (-cfg.motor_pitch_16 / 2, 0),
+    ):
+        motor_plate -= Pos(x, 0, z) * Cylinder(
+            cfg.motor_hole_d / 2, cfg.motor_plate_t + 2
+        )
     motor_plate -= Cylinder(cfg.motor_bore / 2, cfg.motor_plate_t + 2)
     motor_plate = Pos(0, 0, plate_z) * motor_plate
 
@@ -119,11 +124,16 @@ def build(cfg: DroneStand = DroneStand()) -> tuple[Part, Part]:
 
     # Magnet carrier: bolts to the rotor, magnet pocket on the front face.
     carrier = Cylinder(cfg.rotor_d / 2, cfg.carrier_t)
-    for x in (-cfg.rotor_pitch / 2, cfg.rotor_pitch / 2):
-        for z in (-cfg.rotor_pitch / 2, cfg.rotor_pitch / 2):
-            carrier -= Pos(x, z, 0) * Cylinder(
-                cfg.rotor_hole_d / 2, cfg.carrier_t + 2
-            )
+    # Rotor holes: 4 on a Ø12 bolt circle.
+    for x, z in (
+        (0, cfg.rotor_pitch / 2),
+        (0, -cfg.rotor_pitch / 2),
+        (cfg.rotor_pitch / 2, 0),
+        (-cfg.rotor_pitch / 2, 0),
+    ):
+        carrier -= Pos(x, z, 0) * Cylinder(
+            cfg.rotor_hole_d / 2, cfg.carrier_t + 2
+        )
     carrier -= Cylinder(cfg.shaft_d / 2, cfg.carrier_t + 2)
     carrier -= Pos(0, 0, cfg.carrier_t / 2 - cfg.magnet_t / 2) * Cylinder(
         cfg.magnet_d / 2, cfg.magnet_t + 2

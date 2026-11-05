@@ -7,10 +7,11 @@ CAD check passes.
 
 ### Drone motor (Phase 1, #13)
 
-- [ ] Stator bolt pattern: **19 × 16 mm**, M3
-- [ ] Rotor bolt pattern: **12 × 12 mm**, M2
+- [ ] Stator holes: **4 × M3, Ø19 pair (vertical) + Ø16 pair (horizontal)**
+- [ ] Rotor holes: **4 × M2 on a Ø12 bolt circle**
 - [ ] Shaft diameter: **4 mm**
 - [ ] Magnet: **6 mm × 2.15 mm**
+- [ ] Mounting face to rotor face: **21.3 mm**
 - [ ] Cable exit direction (sets the plate orientation)
 
 ### AS5048A board (Phase 1, #13)
