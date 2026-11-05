@@ -50,9 +50,10 @@ class DroneStand:
     sensor_plate_w: float = 25.0
     sensor_plate_h: float = 25.0
     sensor_plate_t: float = 3.0
+    # Common AS5048A breakout (the AliExpress board). Measure when it arrives.
     sensor_pocket_w: float = 15.0
     sensor_pocket_h: float = 17.0
-    sensor_pocket_d: float = 1.5
+    sensor_pocket_d: float = 1.8  # 1.6 mm PCB + 0.2 mm
     sensor_clearance: float = 1.5  # magnet face to sensor face
 
     # Magnet carrier: bolts to the rotor side (12 x 12 mm pattern).
