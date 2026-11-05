@@ -30,7 +30,8 @@ class Motor5010:
     bell_d: float = 52.0
     bell_h: float = 8.3  # 10 + 3 + 8.3 = 21.3 mm to the rotor face
     shaft_d: float = 4.0
-    shaft_l: float = 4.7  # 26 mm overall
+    shaft_l: float = 4.7  # front stub
+    through_shaft_l: float = 8.5  # behind the mounting face
     stator_pitch_19: float = 19.0  # vertical pair
     stator_pitch_16: float = 16.0  # horizontal pair
     stator_hole_d: float = 3.0
@@ -85,9 +86,12 @@ def build(cfg: Motor5010 = Motor5010()) -> Part:
             cfg.rotor_hole_d / 2, 4
         )
 
-    # Shaft stub, ending inside the magnet carrier.
-    motor += Pos(0, rotor_y - cfg.shaft_l / 2, 0) * Rot(90, 0, 0) * Cylinder(
-        cfg.shaft_d / 2, cfg.shaft_l
+    # Through-shaft: front stub plus a length behind the mounting face for
+    # the stator-side magnet holder.
+    shaft_front = rotor_y - cfg.shaft_l
+    shaft_back = cfg.through_shaft_l
+    motor += Pos(0, (shaft_front + shaft_back) / 2, 0) * Rot(90, 0, 0) * Cylinder(
+        cfg.shaft_d / 2, shaft_back - shaft_front
     )
 
     return motor

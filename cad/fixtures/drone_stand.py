@@ -1,12 +1,16 @@
 """Phase 1 fixture: drone motor test stand.
 
-A table-mounted stand that holds a 5010 outrunner with the shaft horizontal.
-The motor bolts to the front of a vertical plate, the magnet carrier bolts to
-the rotor, and a sensor bracket in front of the motor faces the magnet.
+A table-mounted stand for a 5010 outrunner with two encoder interfaces:
+
+- **Stator side (back)**: MicroSpora behind a wall, magnet on the through-shaft.
+  This is the main encoder, on the same side as the motor wires.
+- **Rotor side (front)**: AS5048A breakout on a bracket, magnet on the rotor.
+  This is the output encoder for the Feather bring-up.
 
 Assembly, front (-Y) to back (+Y):
 
-    sensor plate | 1.5 mm gap | magnet carrier | rotor | motor | motor plate | base
+    AS5048A | gap | magnet B | carrier | rotor ‖ stator ‖ 25 mm head
+            | magnet A | wall | MicroSpora
 
 The motor is a reference model (``motor_5010.py``), not a printed part.
 """
@@ -42,23 +46,37 @@ class DroneStand:
     motor_pitch_19: float = 19.0  # vertical pair
     motor_pitch_16: float = 16.0  # horizontal pair
     motor_hole_d: float = 3.4  # M3 clearance
-    motor_bore: float = 12.0  # cable pass-through
+    motor_bore: float = 12.0  # through-shaft clearance
 
-    # Sensor bracket: in front of the motor, facing back (+Y).
-    sensor_plate_w: float = 25.0
-    sensor_plate_h: float = 25.0
-    sensor_plate_t: float = 3.0
-    sensor_pocket_w: float = 15.0
-    sensor_pocket_h: float = 17.0
-    sensor_pocket_d: float = 1.8  # 1.6 mm PCB + 0.2 mm
-    sensor_gap: float = 1.5  # magnet face to board face
-    sensor_post_w: float = 10.0
+    # Stator-side encoder: MicroSpora behind a wall, magnet on the shaft.
+    back_wall_t: float = 3.0
+    back_wall_hole: float = 8.0
+    microspora_w: float = 33.0
+    microspora_h: float = 34.0
+    microspora_pitch_x: float = 28.0
+    microspora_pitch_y: float = 29.0
+    microspora_hole_d: float = 2.4  # M2 clearance
+    microspora_offset_x: float = 0.0
+    microspora_offset_y: float = 0.0
 
-    # Magnet carrier: bolts to the rotor (12 x 12 mm).
+    # Rotor-side encoder: AS5048A on a front bracket.
+    as5048a_plate_w: float = 40.0
+    as5048a_plate_h: float = 40.0
+    as5048a_plate_t: float = 5.0
+    as5048a_pocket_w: float = 15.0
+    as5048a_pocket_h: float = 17.0
+    as5048a_pocket_d: float = 1.8
+    as5048a_gap: float = 3.5  # magnet face to plate face
+    as5048a_post_w: float = 20.0
+    as5048a_post_d: float = 10.0
+
+    # Magnet carrier (rotor side) and magnet holder (stator side).
     rotor_pitch: float = 12.0
     rotor_hole_d: float = 2.4  # M2 clearance
     rotor_d: float = 20.0
     carrier_t: float = 4.0
+    holder_d: float = 10.0
+    holder_t: float = 2.5
     magnet_d: float = 6.2  # pocket: 6 mm magnet + 0.2 mm
     magnet_t: float = 2.25  # pocket: 2.15 mm magnet + 0.1 mm
     magnet_actual_d: float = 6.0
@@ -69,7 +87,7 @@ class DroneStand:
     motor_height: float = 21.3
 
 
-def build(cfg: DroneStand = DroneStand()) -> tuple[Part, Part]:
+def build(cfg: DroneStand = DroneStand()) -> tuple[Part, Part, Part]:
     # Base: clamp slot at the back, four table screws.
     base = Pos(0, 0, cfg.base_t / 2) * Box(cfg.base_w, cfg.base_d, cfg.base_t)
     base -= Pos(0, cfg.base_d / 2 - 10, cfg.base_t / 2) * Box(
@@ -107,29 +125,50 @@ def build(cfg: DroneStand = DroneStand()) -> tuple[Part, Part]:
     for x in (-20, 20):
         motor_plate += Pos(x, 3 + 6, cfg.base_t + 7) * gusset
 
-    # Sensor bracket: a post from the base, in front of the motor, holding a
-    # plate that faces back (+Y) toward the magnet.
+    # Standoffs from the motor plate to the back wall.
+    for x in (-20, 20):
+        for z in (-20, 20):
+            standoff = Rot(90, 0, 0) * Cylinder(5, cfg.holder_t)
+            motor_plate += Pos(
+                x, cfg.motor_plate_t / 2 + cfg.holder_t / 2, plate_z + z
+            ) * standoff
+
+    # Back wall: separates the magnet from the MicroSpora.
+    wall_y = cfg.motor_plate_t / 2 + cfg.holder_t + cfg.back_wall_t / 2
+    back_wall = Box(cfg.motor_plate_w, cfg.back_wall_t, cfg.motor_plate_h)
+    back_wall -= Rot(90, 0, 0) * Cylinder(
+        cfg.back_wall_hole / 2, cfg.back_wall_t + 2
+    )
+    for x in (-cfg.microspora_pitch_x / 2, cfg.microspora_pitch_x / 2):
+        for z in (-cfg.microspora_pitch_y / 2, cfg.microspora_pitch_y / 2):
+            back_wall -= Pos(x, 0, z) * Rot(90, 0, 0) * Cylinder(
+                cfg.microspora_hole_d / 2, cfg.back_wall_t + 2
+            )
+    back_wall = Pos(0, wall_y, plate_z) * back_wall
+
+    # Rotor-side bracket: a post from the base, in front of the motor.
     rotor_y = -cfg.motor_plate_t / 2 - cfg.motor_height
     carrier_front = rotor_y - cfg.carrier_t
-    sensor_face = carrier_front - cfg.sensor_gap
-    sensor_plate_y = sensor_face - cfg.sensor_plate_t / 2
+    sensor_face = carrier_front - cfg.as5048a_gap
+    sensor_plate_y = sensor_face - cfg.as5048a_plate_t / 2
 
-    sensor_plate = Box(cfg.sensor_plate_w, cfg.sensor_plate_t, cfg.sensor_plate_h)
+    sensor_plate = Box(cfg.as5048a_plate_w, cfg.as5048a_plate_t, cfg.as5048a_plate_h)
     sensor_plate -= Pos(
-        0, cfg.sensor_plate_t / 2 - cfg.sensor_pocket_d / 2, 0
-    ) * Box(cfg.sensor_pocket_w, cfg.sensor_pocket_d, cfg.sensor_pocket_h)
+        0, cfg.as5048a_plate_t / 2 - cfg.as5048a_pocket_d / 2, 0
+    ) * Box(cfg.as5048a_pocket_w, cfg.as5048a_pocket_d, cfg.as5048a_pocket_h)
     sensor_plate = Pos(0, sensor_plate_y, plate_z) * sensor_plate
 
-    post_h = plate_z - cfg.sensor_plate_h / 2 - cfg.base_t
-    post = Pos(0, sensor_plate_y, cfg.base_t + post_h / 2) * Box(
-        cfg.sensor_post_w, cfg.sensor_plate_t, post_h
-    )
+    post_h = plate_z - cfg.as5048a_plate_h / 2 - cfg.base_t
+    post = Pos(
+        0,
+        sensor_plate_y - cfg.as5048a_plate_t / 2 + cfg.as5048a_post_d / 2,
+        cfg.base_t + post_h / 2,
+    ) * Box(cfg.as5048a_post_w, cfg.as5048a_post_d, post_h)
 
-    stand = base + motor_plate + sensor_plate + post
+    stand = base + motor_plate + back_wall + sensor_plate + post
 
-    # Magnet carrier: bolts to the rotor, magnet pocket on the front face.
+    # Rotor-side magnet carrier: bolts to the rotor, magnet on the front.
     carrier = Cylinder(cfg.rotor_d / 2, cfg.carrier_t)
-    # Rotor holes: 4 on a Ø12 bolt circle.
     for x, z in (
         (0, cfg.rotor_pitch / 2),
         (0, -cfg.rotor_pitch / 2),
@@ -146,62 +185,106 @@ def build(cfg: DroneStand = DroneStand()) -> tuple[Part, Part]:
     carrier = Rot(90, 0, 0) * carrier
     carrier = Pos(0, rotor_y - cfg.carrier_t / 2, plate_z) * carrier
 
-    return stand, carrier
+    # Stator-side magnet holder: sits on the through-shaft, magnet on the
+    # back face, facing the MicroSpora through the wall.
+    holder = Cylinder(cfg.holder_d / 2, cfg.holder_t)
+    holder -= Cylinder(cfg.shaft_d / 2, cfg.holder_t + 2)
+    holder -= Pos(0, 0, cfg.holder_t / 2 - cfg.magnet_t / 2 + 0.5) * Cylinder(
+        cfg.magnet_d / 2, cfg.magnet_t + 1
+    )
+    holder = Rot(90, 0, 0) * holder
+    holder = Pos(0, cfg.motor_plate_t / 2 + cfg.holder_t / 2, plate_z) * holder
+
+    return stand, carrier, holder
 
 
-def sensor_board(cfg: DroneStand = DroneStand()) -> Part:
-    """Reference AS5048A board, sitting in the sensor pocket."""
-    board = Box(cfg.sensor_pocket_w - 0.2, 1.6, cfg.sensor_pocket_h - 0.2)
+def sensor_board_as5048a(cfg: DroneStand = DroneStand()) -> Part:
+    """Reference AS5048A board, sitting in the front pocket."""
+    board = Box(cfg.as5048a_pocket_w - 0.2, 1.6, cfg.as5048a_pocket_h - 0.2)
     chip = Box(3.0, 0.8, 3.0)
     board += Pos(0, 0.8 + 0.4, 0) * chip
     return board
 
 
+def sensor_board_microspora(cfg: DroneStand = DroneStand()) -> Part:
+    """Reference MicroSpora board, on the back wall."""
+    board = Box(cfg.microspora_w, 1.6, cfg.microspora_h)
+    chip = Box(3.0, 0.8, 3.0)
+    board += Pos(
+        cfg.microspora_offset_x, -0.8 - 0.4, cfg.microspora_offset_y
+    ) * chip
+    return board
+
+
 def magnet(cfg: DroneStand = DroneStand()) -> Part:
-    """Reference diametric magnet, sitting in the carrier pocket."""
+    """Reference diametric magnet."""
     return Rot(90, 0, 0) * Cylinder(cfg.magnet_actual_d / 2, cfg.magnet_actual_t)
 
 
-def assembly_parts(cfg: DroneStand = DroneStand()) -> list[tuple[str, Part, str]]:
-    """Stand, motor, carrier, magnet, and sensor board, in position."""
-    stand, carrier = build(cfg)
+def assembly_parts(
+    cfg: DroneStand = DroneStand(), sensor: str = "microspora"
+) -> list[tuple[str, Part, str]]:
+    """Stand, motor, and the chosen encoder, in their working positions."""
+    stand, carrier, holder = build(cfg)
     plate_z = cfg.base_t + cfg.motor_plate_h / 2
 
     motor = Pos(0, -cfg.motor_plate_t / 2, plate_z) * motor_5010.build()
 
-    rotor_y = -cfg.motor_plate_t / 2 - cfg.motor_height
-    sensor_face = rotor_y - cfg.carrier_t - cfg.sensor_gap
-    board = Pos(0, sensor_face - 0.8, plate_z) * sensor_board(cfg)
-
-    magnet_y = (
-        rotor_y
-        - cfg.carrier_t
-        + (cfg.magnet_t - cfg.magnet_actual_t)
-        + cfg.magnet_actual_t / 2
-    )
-    magnet_part = Pos(0, magnet_y, plate_z) * magnet(cfg)
-
-    return [
+    parts: list[tuple[str, Part, str]] = [
         ("stand", stand, "#8fa8c8"),
         ("motor", motor, "#e0a060"),
-        ("carrier", carrier, "#7fc8a0"),
-        ("magnet", magnet_part, "#c080d0"),
-        ("sensor", board, "#d07070"),
     ]
+
+    if sensor == "microspora":
+        # Magnet A on the through-shaft, board on the back wall.
+        magnet_y = cfg.motor_plate_t / 2 + cfg.holder_t - cfg.magnet_actual_t / 2
+        wall_back = (
+            cfg.motor_plate_t / 2 + cfg.holder_t + cfg.back_wall_t
+        )
+        parts += [
+            ("holder", holder, "#7fc8a0"),
+            ("magnet", Pos(0, magnet_y, plate_z) * magnet(cfg), "#c080d0"),
+            (
+                "microspora",
+                Pos(0, wall_back + 0.8, plate_z) * sensor_board_microspora(cfg),
+                "#d07070",
+            ),
+        ]
+    else:
+        # Magnet B on the rotor, board in the front bracket.
+        rotor_y = -cfg.motor_plate_t / 2 - cfg.motor_height
+        magnet_y = rotor_y - cfg.carrier_t + cfg.magnet_actual_t / 2
+        sensor_face = rotor_y - cfg.carrier_t - cfg.as5048a_gap
+        parts += [
+            ("carrier", carrier, "#7fc8a0"),
+            ("magnet", Pos(0, magnet_y, plate_z) * magnet(cfg), "#c080d0"),
+            (
+                "as5048a",
+                Pos(0, sensor_face + 0.8, plate_z) * sensor_board_as5048a(cfg),
+                "#d07070",
+            ),
+        ]
+
+    return parts
 
 
 def assemblies() -> dict[str, list[tuple[str, Part, str]]]:
-    return {"drone_stand_assembly": assembly_parts()}
+    return {
+        "drone_stand_microspora": assembly_parts(sensor="microspora"),
+        "drone_stand_as5048a": assembly_parts(sensor="as5048a"),
+    }
 
 
 def parts() -> dict[str, Part]:
     """Named parts, for the viewer and the exporter."""
-    stand, carrier = build()
+    stand, carrier, holder = build()
     return {
         "drone_stand": stand,
         "drone_magnet_carrier": carrier,
+        "drone_magnet_holder": holder,
         "drone_magnet": magnet(),
-        "drone_sensor_board": sensor_board(),
+        "drone_sensor_as5048a": sensor_board_as5048a(),
+        "drone_sensor_microspora": sensor_board_microspora(),
     }
 
 

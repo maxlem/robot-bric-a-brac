@@ -14,25 +14,26 @@ CAD check passes.
 - [ ] Mounting face to rotor face: **21.3 mm**
 - [ ] Cable exit direction (sets the plate orientation)
 
-### AS5048A board (Phase 1, #13)
+### AS5048A board (Phase 1, #13, rotor side)
 
 - [ ] PCB outline (assumed 15 × 17 mm)
 - [ ] Mounting hole pattern and diameter
 - [ ] Connector position and height
-- [ ] Magnet-to-sensor gap: 0.5–3 mm (1.5 mm default)
+- [ ] Magnet-to-sensor gap: 0.5–3 mm (0.9 mm in the model)
+
+### MicroSpora (Phase 1, #13, stator side)
+
+- [ ] Board outline: **33 × 34 mm**
+- [ ] Mounting hole pattern and diameter
+- [ ] MT6701 position relative to the board centre
+- [ ] USB and connector clearance
+- [ ] Magnet-to-sensor gap: 0.5–3 mm (2.2 mm in the model)
 
 ### DM5010 (Phase 1, #14)
 
 - [ ] Mounting holes: **4 × M2.5 on a 20.4 mm pattern**
 - [ ] Bore: **8.1 mm**
 - [ ] Shaft / rotor face height
-
-### MicroSpora (Phase 1, #14)
-
-- [ ] Board outline: **33 × 34 mm**
-- [ ] Mounting hole pattern and diameter
-- [ ] MT6701 position relative to the board centre
-- [ ] USB and connector clearance
 
 ### Belt (Phase 2, #15)
 

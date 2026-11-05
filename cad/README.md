@@ -35,6 +35,8 @@ Then open <http://127.0.0.1:8765/>. Save any file under `cad/` or
 - Sidebar: **Assemblies** first, then **Parts**; green for ok, red for a
   build error.
 - Click an assembly to see its components together, each in its own colour.
+  The drone stand has two: `drone_stand_microspora` (stator side) and
+  `drone_stand_as5048a` (rotor side).
 - Click a part to show it alone; click an error to read the traceback.
 - HUD: volume, bounding box, triangle count, build time.
 - `Rebuild` forces a build; `wireframe` toggles the material.
