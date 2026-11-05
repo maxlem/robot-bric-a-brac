@@ -60,8 +60,8 @@ class DroneStand:
     rotor_hole_d: float = 2.4  # M2 clearance
     rotor_d: float = 20.0
     carrier_t: float = 4.0
-    magnet_d: float = 6.2
-    magnet_t: float = 2.5
+    magnet_d: float = 6.2  # 6 mm magnet + 0.2 mm clearance
+    magnet_t: float = 2.5  # TODO: confirm the thickness
     shaft_d: float = 4.0
 
 
