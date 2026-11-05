@@ -53,9 +53,13 @@ class DroneStand:
     sensor_pocket_w: float = 15.0
     sensor_pocket_h: float = 17.0
     sensor_pocket_d: float = 1.5
-    sensor_gap: float = 1.5
+    sensor_clearance: float = 1.5  # magnet face to sensor face
 
-    # Magnet carrier.
+    # Magnet carrier: bolts to the rotor side (12 x 12 mm pattern).
+    rotor_pitch: float = 12.0
+    rotor_hole_d: float = 2.4  # M2 clearance
+    rotor_d: float = 20.0
+    carrier_t: float = 4.0
     magnet_d: float = 6.2
     magnet_t: float = 2.5
     shaft_d: float = 4.0
@@ -91,8 +95,15 @@ def build(cfg: DroneStand = DroneStand()) -> tuple[Part, Part]:
     motor_plate -= Cylinder(cfg.motor_bore / 2, cfg.motor_plate_t + 2)
     motor_plate = Pos(0, plate_y, plate_z) * motor_plate
 
-    # Sensor plate behind the motor, facing -Y, on a post.
-    sensor_y = plate_y + cfg.motor_plate_t / 2 + cfg.sensor_gap + cfg.sensor_plate_t / 2
+    # Sensor plate behind the motor, facing -Y, on a post. The carrier sits
+    # between the motor plate and the sensor, so the sensor clears it.
+    sensor_y = (
+        plate_y
+        + cfg.motor_plate_t / 2
+        + cfg.carrier_t
+        + cfg.sensor_clearance
+        + cfg.sensor_plate_t / 2
+    )
     sensor_plate = Box(cfg.sensor_plate_w, cfg.sensor_plate_t, cfg.sensor_plate_h)
     sensor_plate -= Pos(0, -cfg.sensor_plate_t / 2, 0) * Box(
         cfg.sensor_pocket_w, cfg.sensor_pocket_d, cfg.sensor_pocket_h
@@ -104,10 +115,16 @@ def build(cfg: DroneStand = DroneStand()) -> tuple[Part, Part]:
 
     stand = base + riser + motor_plate + sensor_plate + post
 
-    # Magnet carrier: press-fits the shaft, holds the magnet on the sensor side.
-    carrier = Cylinder(cfg.magnet_d / 2 + 2, cfg.magnet_t + 2)
-    carrier -= Cylinder(cfg.shaft_d / 2, cfg.magnet_t + 4)
-    carrier -= Pos(0, 0, cfg.magnet_t / 2) * Cylinder(cfg.magnet_d / 2, cfg.magnet_t + 2)
+    # Magnet carrier: bolts to the rotor side (12 x 12 mm), holds the magnet
+    # on the sensor side, and clears the shaft.
+    carrier = Cylinder(cfg.rotor_d / 2, cfg.carrier_t)
+    for x in (-cfg.rotor_pitch / 2, cfg.rotor_pitch / 2):
+        for y in (-cfg.rotor_pitch / 2, cfg.rotor_pitch / 2):
+            carrier -= Pos(x, y, 0) * Cylinder(cfg.rotor_hole_d / 2, cfg.carrier_t + 2)
+    carrier -= Cylinder(cfg.shaft_d / 2, cfg.carrier_t + 2)
+    carrier -= Pos(0, 0, cfg.carrier_t / 2 - cfg.magnet_t / 2) * Cylinder(
+        cfg.magnet_d / 2, cfg.magnet_t + 2
+    )
 
     return stand, carrier
 
