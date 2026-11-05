@@ -59,8 +59,10 @@ class DroneStand:
     rotor_hole_d: float = 2.4  # M2 clearance
     rotor_d: float = 20.0
     carrier_t: float = 4.0
-    magnet_d: float = 6.2  # 6 mm magnet + 0.2 mm
-    magnet_t: float = 2.25  # 2.15 mm magnet + 0.1 mm
+    magnet_d: float = 6.2  # pocket: 6 mm magnet + 0.2 mm
+    magnet_t: float = 2.25  # pocket: 2.15 mm magnet + 0.1 mm
+    magnet_actual_d: float = 6.0
+    magnet_actual_t: float = 2.15
     shaft_d: float = 4.0
 
     # Motor envelope: mounting face to rotor face (21.3 mm on the drawing).
@@ -138,8 +140,8 @@ def build(cfg: DroneStand = DroneStand()) -> tuple[Part, Part]:
             cfg.rotor_hole_d / 2, cfg.carrier_t + 2
         )
     carrier -= Cylinder(cfg.shaft_d / 2, cfg.carrier_t + 2)
-    carrier -= Pos(0, 0, cfg.carrier_t / 2 - cfg.magnet_t / 2) * Cylinder(
-        cfg.magnet_d / 2, cfg.magnet_t + 2
+    carrier -= Pos(0, 0, cfg.carrier_t / 2 - cfg.magnet_t / 2 + 0.5) * Cylinder(
+        cfg.magnet_d / 2, cfg.magnet_t + 1
     )
     carrier = Rot(90, 0, 0) * carrier
     carrier = Pos(0, rotor_y - cfg.carrier_t / 2, plate_z) * carrier
@@ -155,8 +157,13 @@ def sensor_board(cfg: DroneStand = DroneStand()) -> Part:
     return board
 
 
+def magnet(cfg: DroneStand = DroneStand()) -> Part:
+    """Reference diametric magnet, sitting in the carrier pocket."""
+    return Rot(90, 0, 0) * Cylinder(cfg.magnet_actual_d / 2, cfg.magnet_actual_t)
+
+
 def assembly_parts(cfg: DroneStand = DroneStand()) -> list[tuple[str, Part, str]]:
-    """Stand, motor, carrier, and sensor board, in their working positions."""
+    """Stand, motor, carrier, magnet, and sensor board, in position."""
     stand, carrier = build(cfg)
     plate_z = cfg.base_t + cfg.motor_plate_h / 2
 
@@ -166,10 +173,19 @@ def assembly_parts(cfg: DroneStand = DroneStand()) -> list[tuple[str, Part, str]
     sensor_face = rotor_y - cfg.carrier_t - cfg.sensor_gap
     board = Pos(0, sensor_face - 0.8, plate_z) * sensor_board(cfg)
 
+    magnet_y = (
+        rotor_y
+        - cfg.carrier_t
+        + (cfg.magnet_t - cfg.magnet_actual_t)
+        + cfg.magnet_actual_t / 2
+    )
+    magnet_part = Pos(0, magnet_y, plate_z) * magnet(cfg)
+
     return [
         ("stand", stand, "#8fa8c8"),
         ("motor", motor, "#e0a060"),
         ("carrier", carrier, "#7fc8a0"),
+        ("magnet", magnet_part, "#c080d0"),
         ("sensor", board, "#d07070"),
     ]
 
@@ -184,6 +200,7 @@ def parts() -> dict[str, Part]:
     return {
         "drone_stand": stand,
         "drone_magnet_carrier": carrier,
+        "drone_magnet": magnet(),
         "drone_sensor_board": sensor_board(),
     }
 
