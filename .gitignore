@@ -21,3 +21,6 @@ Thumbs.db
 
 # Local backups
 *.bak
+
+# CAD build output
+cad/build/
