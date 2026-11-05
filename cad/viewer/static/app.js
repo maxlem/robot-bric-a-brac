@@ -26,15 +26,22 @@ const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 
-scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x1a1f28, 1.1));
+scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x1a1f28, 1.0));
 
-const key = new THREE.DirectionalLight(0xffffff, 2.0);
-key.position.set(80, 120, 90);
+// Key: front-right, above the camera side.
+const key = new THREE.DirectionalLight(0xffffff, 1.8);
+key.position.set(80, -120, 100);
 scene.add(key);
 
-const fill = new THREE.DirectionalLight(0x88aaff, 0.7);
-fill.position.set(-90, 40, -70);
+// Fill: front-left, low.
+const fill = new THREE.DirectionalLight(0x88aaff, 0.6);
+fill.position.set(-90, -40, 40);
 scene.add(fill);
+
+// Rim: the opposing corner, behind and above.
+const rim = new THREE.DirectionalLight(0xffe0c0, 0.9);
+rim.position.set(-80, 120, 80);
+scene.add(rim);
 
 const grid = new THREE.GridHelper(200, 20, 0x2b3240, 0x1a1f27);
 grid.rotation.x = Math.PI / 2; // lie in the XY plane
