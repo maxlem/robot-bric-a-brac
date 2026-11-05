@@ -79,6 +79,9 @@ cad/.venv/bin/python cad/viewer/server.py --open
 
 - Every fixture exposes `parts() -> dict[str, Part]`; add new fixtures to
   `MODULES` in `cad/viewer/buildlib.py`.
+- A fixture can also expose
+  `assemblies() -> dict[str, list[tuple[str, Part, str]]]` to show positioned
+  components together, each with a colour.
 - The build runs in a long-lived worker (`viewer/worker.py`) that imports
   build123d once, so a rebuild is about a second.
 - A build error is shown as a traceback in the page, not a crash.

@@ -32,10 +32,18 @@ cad/.venv/bin/python cad/viewer/server.py --open
 Then open <http://127.0.0.1:8765/>. Save any file under `cad/` or
 `cad/fixtures/` and the page rebuilds and reloads the mesh.
 
-- Sidebar: one row per part, green for ok, red for a build error.
-- Click a part to show it; click an error to read the traceback.
+- Sidebar: **Assemblies** first, then **Parts**; green for ok, red for a
+  build error.
+- Click an assembly to see its components together, each in its own colour.
+- Click a part to show it alone; click an error to read the traceback.
 - HUD: volume, bounding box, triangle count, build time.
 - `Rebuild` forces a build; `wireframe` toggles the material.
+
+A fixture can expose `parts() -> dict[str, Part]` and
+`assemblies() -> dict[str, list[tuple[str, Part, str]]]`, where each tuple is
+`(component name, positioned part, colour)`. Assembly components are exported
+with an `<assembly>__` prefix, so they can share a frame without clashing with
+the flat parts.
 
 The build runs in a long-lived worker that imports build123d once, so a
 rebuild is about a second. The page loads three.js from a CDN, so the first

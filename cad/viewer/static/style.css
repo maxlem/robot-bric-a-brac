@@ -87,6 +87,15 @@ body {
   flex: 1;
 }
 
+#parts .section {
+  padding: 12px 10px 4px;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: default;
+}
+
 .part {
   display: grid;
   grid-template-columns: 10px 1fr;
