@@ -13,7 +13,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from build123d import Box, Cylinder, Part, Pos
+from build123d import Box, Cylinder, Part, Pos, Rot
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from export import export  # noqa: E402
@@ -77,8 +77,12 @@ def build(cfg: DM5010Mount = DM5010Mount()) -> tuple[Part, Part]:
     motor_plate = Box(cfg.motor_plate_w, cfg.motor_plate_t, cfg.motor_plate_h)
     for x in (-cfg.motor_pitch / 2, cfg.motor_pitch / 2):
         for z in (-cfg.motor_pitch / 2, cfg.motor_pitch / 2):
-            motor_plate -= Pos(x, 0, z) * Cylinder(cfg.motor_hole_d / 2, cfg.motor_plate_t + 2)
-    motor_plate -= Cylinder(cfg.motor_bore / 2, cfg.motor_plate_t + 2)
+            motor_plate -= Pos(x, 0, z) * Rot(90, 0, 0) * Cylinder(
+                cfg.motor_hole_d / 2, cfg.motor_plate_t + 2
+            )
+    motor_plate -= Rot(90, 0, 0) * Cylinder(
+        cfg.motor_bore / 2, cfg.motor_plate_t + 2
+    )
     motor_plate = Pos(0, plate_y, plate_z) * motor_plate
 
     # Board plate behind the motor, facing -Y, on a post.
@@ -86,10 +90,12 @@ def build(cfg: DM5010Mount = DM5010Mount()) -> tuple[Part, Part]:
     board_plate = Box(cfg.board_w, 3.0, cfg.board_h)
     for x in (-cfg.board_pitch_x / 2, cfg.board_pitch_x / 2):
         for z in (-cfg.board_pitch_y / 2, cfg.board_pitch_y / 2):
-            board_plate -= Pos(x, 0, z) * Cylinder(cfg.board_hole_d / 2, 5)
-    board_plate -= Pos(cfg.sensor_offset_x, 0, cfg.sensor_offset_y) * Cylinder(
-        cfg.sensor_opening / 2, 5
-    )
+            board_plate -= Pos(x, 0, z) * Rot(90, 0, 0) * Cylinder(
+                cfg.board_hole_d / 2, 5
+            )
+    board_plate -= Pos(cfg.sensor_offset_x, 0, cfg.sensor_offset_y) * Rot(
+        90, 0, 0
+    ) * Cylinder(cfg.sensor_opening / 2, 5)
     board_plate = Pos(0, board_y, plate_z) * board_plate
 
     post_h = plate_z - cfg.base_t
