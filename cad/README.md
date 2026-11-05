@@ -21,6 +21,27 @@ cad/.venv/bin/python cad/fixtures/dm5010_mount.py
 
 Parts are written to `cad/build/` as STEP and STL.
 
+## Live viewer
+
+A local 3D viewer that rebuilds on save and shows the status of every part:
+
+```sh
+cad/.venv/bin/python cad/viewer/server.py --open
+```
+
+Then open <http://127.0.0.1:8765/>. Save any file under `cad/` or
+`cad/fixtures/` and the page rebuilds and reloads the mesh.
+
+- Sidebar: one row per part, green for ok, red for a build error.
+- Click a part to show it; click an error to read the traceback.
+- HUD: volume, bounding box, triangle count, build time.
+- `Rebuild` forces a build; `wireframe` toggles the material.
+
+The build runs in a long-lived worker that imports build123d once, so a
+rebuild is about a second. The page loads three.js from a CDN, so the first
+load needs network access. Changes to `cad/viewer/` itself need a server
+restart.
+
 ## Layout
 
 ```text
@@ -31,6 +52,12 @@ cad/
   fixtures/
     drone_stand.py     Phase 1: drone motor test stand
     dm5010_mount.py    Phase 1: DM5010 + MicroSpora mount
+  viewer/
+    server.py          HTTP server, file watcher, SSE
+    buildlib.py        shared build logic
+    worker.py          long-lived build process
+    build.py           one-shot CLI build
+    static/            three.js page
 ```
 
 ## Dimensions
