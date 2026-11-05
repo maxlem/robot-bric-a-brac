@@ -58,7 +58,13 @@ The Feather has one GND pin. Use a ground rail or a small 3-way junction: one wi
 - [ ] Motor phase C -> `OUTC`
 - [ ] PSU positive -> `VBAT`
 - [ ] PSU negative -> `PGND`
-- [ ] Optional: EVM `J3-19 nFAULT` -> Feather `A0`
+- [ ] Leave EVM `J3-19 nFAULT` unconnected
+- [ ] EVM `J3-14 ISENA` -> Feather `A0` (current sense)
+- [ ] EVM `J3-16 ISENB` -> Feather `A1` (current sense)
+- [ ] EVM `J3-18 ISENC` -> Feather `A2` (current sense)
+- [ ] EVM `J3-6 VSENA` -> Feather `A3` (voltage sense)
+- [ ] EVM `J3-8 VSENB` -> Feather `A4` (voltage sense)
+- [ ] EVM `J3-10 VSENC` -> Feather `A5` (voltage sense)
 
 ## 4. Feather M4 pins used
 
@@ -78,7 +84,12 @@ The Feather has one GND pin. Use a ground rail or a small 3-way junction: one wi
 | D5 | Encoder `CSn` | output | encoder chip select |
 | 3V3 | encoder VDD | power | 3.3 V logic |
 | GND | ground rail -> EVM `AGND`; encoder GND and `DRVOFF` join the rail | ground | common logic ground |
-| A0 | DRV8316 `nFAULT` (optional) | input | not used by the current firmware |
+| A0 | DRV8316 `ISENA` | analog input | synchronized current sensing |
+| A1 | DRV8316 `ISENB` | analog input | synchronized current sensing |
+| A2 | DRV8316 `ISENC` | analog input | synchronized current sensing |
+| A3 | DRV8316 `VSENA` | analog input | synchronized voltage sensing |
+| A4 | DRV8316 `VSENB` | analog input | synchronized voltage sensing |
+| A5 | DRV8316 `VSENC` | analog input | synchronized voltage sensing |
 
 ## 5. DRV8316EVM connections
 
@@ -99,7 +110,16 @@ The EVM header pin numbers below are from the DRV8316xEVM user guide. Verify pin
 | D6 | J3 pin 17 | `nSLEEP` | high = device awake |
 | Ground rail | J4 pin 16 | `DRVOFF` | low = gate driver enabled |
 | Ground rail | J3 pin 4 | `AGND` | logic ground |
-| A0 (optional) | J3 pin 19 | `nFAULT` | active-low fault output |
+| A0 | J3 pin 14 | `ISENA` | phase A current sense |
+| A1 | J3 pin 16 | `ISENB` | phase B current sense |
+| A2 | J3 pin 18 | `ISENC` | phase C current sense |
+| A3 | J3 pin 6 | `VSENA` | phase A voltage sense |
+| A4 | J3 pin 8 | `VSENB` | phase B voltage sense |
+| A5 | J3 pin 10 | `VSENC` | phase C voltage sense |
+
+Leave `nFAULT` (J3-19) unconnected. D4 is the CAN boost enable and D5 is the encoder CS; do not put nFAULT on either. The firmware reads the DRV8316 fault status over SPI.
+
+The `ISENx`/`VSENx` rows above are the synchronized-sensing mapping; wire them to A0-A5. `VSENVM` (J3-12) is not used because the main bus voltage is sensed centrally.
 
 Do not use J3 pin 9 (`nSLEEP` DNP) or J3 pin 15 (`nFAULT` DNP). They are not populated for external use.
 
@@ -122,7 +142,7 @@ Connect the three motor phases to the screw terminal labeled `OUTA`, `OUTB`, `OU
 
 Start with **12 V** and a **0.5 A to 1 A current limit**. Increase only after the open-loop test works. Never connect or disconnect motor phases while the supply is on.
 
-The EVM's internal buck converter should be set to 3.3 V (default). The `3.3VBK` LED should light when `VM` is present. Do not connect the EVM `3.3VBK` output to the Feather `3V3` pin while the Feather is powered over USB.
+The EVM's internal buck converter should be set to 3.3 V (default). The `3.3VBK` LED should light when `VM` is present. Do not connect the EVM `3.3VBK` output to the Feather `3V3` pin while the Feather is powered over USB. Do not connect it to the Feather `AREF` pin either: `AREF` is the ADC reference, not ground, and tying it to the EVM buck can shut the buck down.
 
 ### Encoder
 
@@ -149,7 +169,7 @@ The encoder must be mounted with its magnet centered on the motor shaft and at t
 6. **Enable pins.** Connect D6 to `nSLEEP`. Connect `DRVOFF` to the ground rail.
 7. **DRV8316 SPI.** Connect D9 to `nSCS`, MOSI (D24) to `SDI`, MISO (D23) to `SDO`, SCK (D25) to `SCLK`.
 8. **Encoder.** Connect 3V3, GND, SCK, MOSI, MISO, and CS as in the encoder table.
-9. **Optional fault.** Connect `nFAULT` to A0 if you want to check it later.
+9. **Fault.** Leave `nFAULT` (J3-19) unconnected; the firmware reads fault status over SPI. D4 is the CAN boost enable and D5 is the encoder CS.
 
 ## 8. Pre-power checks
 
@@ -167,7 +187,7 @@ With all power off, use a multimeter:
 ## 9. Power-up sequence
 
 1. **Encoder-only test.** Connect the Feather USB and upload the sensor test with the 12 V supply output off. Then power the EVM at 12 V with a 0.2 A current limit. The firmware keeps `nSLEEP` low and PWM low, so the motor stays asleep. Rotate the motor by hand and confirm that the angle changes smoothly. Do not leave the EVM unpowered while the Feather is driving its inputs.
-2. **Open-loop test.** Set the PSU to 12 V with a 1 A limit, enable the PSU, and upload the open-loop firmware. The motor should spin slowly. If it does not, raise `VOLTAGE_LIMIT` in `src/main.cpp` from 1.0 V to 1.5 V or 2.0 V, and check the current limit.
+2. **Open-loop test.** Set the PSU to 12 V with a 1–3 A limit, enable the PSU, and upload the open-loop/scope firmware. The motor should spin slowly. If it does not, raise `VOLTAGE_LIMIT` in `src/main.cpp` and check the current limit. The 5010 motor may need up to 3 A to break cogging; the DRV8316EVM is rated for 3 A continuous.
 3. **Closed-loop test.** Secure the motor, upload the closed-loop firmware, and watch the serial output. `initFOC` will move the rotor during alignment. `initFOC 1` means success.
 
 Do not leave the motor free to jump during `initFOC`. Keep the shaft lightly loaded or clamped.
@@ -178,13 +198,13 @@ In `src/main.cpp`:
 
 | Setting | Default | Change when |
 |---|---|---|
-| `TEST_MODE` | `MODE_SENSOR_TEST` | move to `MODE_OPEN_LOOP`, then `MODE_CLOSED_LOOP` |
+| `TEST_MODE` | `MODE_SENSING_SCOPE` | use `MODE_SENSOR_TEST` when the AS5048A arrives, `MODE_OPEN_LOOP` for motor-only tests |
 | `USE_6PWM` | `0` | set to `1` only when you want 6-PWM with the existing wiring |
-| `ENCODER_TYPE` | `ENCODER_AS5047P` | set to `ENCODER_AS5048A` if that is your chip |
+| `ENCODER_TYPE` | `ENCODER_AS5048A` | set to `ENCODER_AS5047P` if that is your chip |
 | `POLE_PAIRS` | `7` | 14 magnets = 7 pole pairs, which matches this motor |
-| `SUPPLY_VOLTAGE` | `12.0f` | match your bench supply |
-| `VOLTAGE_LIMIT` | `1.0f` | increase if the motor does not start in open loop |
-| `TARGET_VELOCITY` | `2.0f` | initial test speed in rad/s |
+| `SUPPLY_VOLTAGE` | `12.0f` | match your bench supply, or the central bus voltage |
+| `VOLTAGE_LIMIT` | `1.5f` | increase if the motor does not start in open loop |
+| `TARGET_VELOCITY` | `8.0f` | initial test speed in rad/s |
 
 ## 11. Troubleshooting
 
@@ -204,7 +224,22 @@ In `src/main.cpp`:
 - On the Feather M4, D0 and D1 are labeled **RX** and **TX**. They are also Serial1; if you later add the Raspberry Pi on Serial1, use a different low-side pin set.
 - The low-side pins are intentionally PWM-capable and timer-compatible with the high-side pins: D10/TX (D1), D11/RX (D0), and D12/D13. Setting `USE_6PWM` to `1` switches the driver to 6-PWM without changing the wiring.
 - D13 is also the Feather's red LED, so it will be on during 3-PWM operation and may flicker in 6-PWM mode.
-- The DRV8316 current-sense outputs (`ISENA/B/C`) are not connected yet. The current firmware uses voltage mode, not FOC current control.
+- The DRV8316 current-sense outputs (`ISENA/B/C`) connect to A0-A2 and the phase-voltage outputs (`VSENA/B/C`) to A3-A5 for synchronized telemetry. The motor still runs in voltage open-loop; the measurements are for the scope, not closed-loop current control.
 - The EVM Hall connector is not used because the motor has an SPI magnetic encoder.
 - The Feather SPI header is labeled SCK/MOSI/MISO, not D25/D24/D23. The DRV8316 and encoder share those three lines; each has its own CS.
 - Keep the encoder SPI wires short. If the encoder readings are noisy, lower the SPI clock in `src/main.cpp` from 1 MHz to 500 kHz.
+
+## 13. Scope telemetry
+
+`MODE_SCOPE` streams SimpleFOCScope packets over USB serial at 115200 baud:
+
+- newline-terminated header `ScopeData`, then the binary `ScopeData` struct
+- struct definition: `firmware/motor-test/include/ScopeData.h`
+- fields: `ia`, `ib`, `ic`, `va`, `vb`, `vc`
+- `ia`…`vc` are populated in `MODE_SENSING_SCOPE` from A0–A5
+- `ia`…`ic` use the DRV8316 150 mV/A current-sense output
+- `va`…`vc` are the raw ADC voltages from the EVM’s phase-voltage dividers; scale them with the divider ratio for actual phase volts
+
+Power the EVM at 12 V **before** resetting the Feather so the current-sense offset calibration sees the real 0 A bias. If you power it later, reset the Feather again.
+
+In SimpleFOCScope, set `headers = ["ScopeData.h"]` and `bauds = 115200`, and copy `ScopeData.h` into the app’s working directory.

@@ -3,6 +3,8 @@
 #include <SimpleFOC.h>
 #include <SimpleFOCDrivers.h>
 #include "drivers/drv8316/drv8316.h"
+#include "current_sense/hardware_specific/samd/samd51_sensing.h"
+#include "ScopeData.h"
 
 #define MODE_SENSOR_TEST 0
 #define MODE_OPEN_LOOP 1
@@ -12,8 +14,10 @@
 #define MODE_PIN_LOOPBACK 5
 #define MODE_DIAG 6
 #define MODE_DRV_TEST 7
+#define MODE_SCOPE 8
+#define MODE_SENSING_SCOPE 9
 
-#define TEST_MODE MODE_OPEN_LOOP
+#define TEST_MODE MODE_SENSING_SCOPE
 #define USE_6PWM 0
 
 #define PIN_PWM_A 10
@@ -34,9 +38,12 @@
 #define POLE_PAIRS 7
 #define SUPPLY_VOLTAGE 12.0f
 #define VOLTAGE_LIMIT 1.5f
-#define TARGET_VELOCITY 8.0f
+#define TARGET_VELOCITY 5.0f
+#define MOTOR_RUN_TIMEOUT_MS 30000
 
 BLDCMotor motor(POLE_PAIRS);
+LowsideCurrentSense current_sense(150.0f, A2, A3, _NC);
+uint32_t motor_start_ms = 0;
 #if USE_6PWM
 DRV8316Driver6PWM driver(PIN_PWM_A, PIN_INL_A, PIN_PWM_B, PIN_INL_B, PIN_PWM_C, PIN_INL_C, PIN_DRV_CS);
 #else
@@ -96,9 +103,64 @@ void testDRV() {
   if (status.isFault()) driver.clearFault();
 }
 
+static uint64_t oldestTimestamp(const uint64_t* timestamps, uint8_t count) {
+  uint64_t base = 0;
+  for (uint8_t i = 0; i < count; i++) {
+    if (timestamps[i] != 0 && (base == 0 || timestamps[i] < base)) base = timestamps[i];
+  }
+  return base;
+}
+
+static uint16_t timestampOffsetUs(uint64_t timestamp_us, uint64_t base_us) {
+  if (timestamp_us < base_us) return 0;
+  uint64_t offset_us = timestamp_us - base_us;
+  return offset_us > 0xFFFF ? 0xFFFF : (uint16_t)offset_us;
+}
+
+void sendScopeData() {
+  ScopeData data = {};
+#if TEST_MODE == MODE_SENSING_SCOPE
+  PhaseCurrent_s currents = current_sense.getPhaseCurrents();
+  uint64_t timestamps[7] = {
+    _getSAMD51SensingTimestamp(A2),
+    _getSAMD51SensingTimestamp(A3),
+    0,
+    _getSAMD51SensingTimestamp(A0),
+    _getSAMD51SensingTimestamp(A1),
+    _getSAMD51SensingTimestamp(A4),
+    _getSAMD51SensingTimestamp(A5)
+  };
+  data.ia = currents.a;
+  data.ib = currents.b;
+  data.ic = -(currents.a + currents.b);
+
+  data.va = _readSAMD51VoltageSense(A0);
+  timestamps[3] = _getSAMD51SensingTimestamp(A0);
+  data.vb = _readSAMD51VoltageSense(A1);
+  timestamps[4] = _getSAMD51SensingTimestamp(A1);
+  data.vc = _readSAMD51VoltageSense(A4);
+  timestamps[5] = _getSAMD51SensingTimestamp(A4);
+  data.vm = _readSAMD51VMSense(A5);
+  timestamps[6] = _getSAMD51SensingTimestamp(A5);
+
+  uint64_t base_us = oldestTimestamp(timestamps, 7);
+  data.base_timestamp_us = base_us;
+  data.ia_offset_us = timestampOffsetUs(timestamps[0], base_us);
+  data.ib_offset_us = timestampOffsetUs(timestamps[1], base_us);
+  data.ic_offset_us = timestampOffsetUs(timestamps[0], base_us);
+  data.va_offset_us = timestampOffsetUs(timestamps[3], base_us);
+  data.vb_offset_us = timestampOffsetUs(timestamps[4], base_us);
+  data.vc_offset_us = timestampOffsetUs(timestamps[5], base_us);
+  data.vm_offset_us = timestampOffsetUs(timestamps[6], base_us);
+#endif
+  Serial.write("ScopeData\n", 10);
+  Serial.write((uint8_t*)&data, sizeof(data));
+}
+
 void setup() {
   Serial.begin(115200);
   delay(3000);
+  analogRead(A3);
 
   pinMode(PIN_N_SLEEP, OUTPUT);
   digitalWrite(PIN_N_SLEEP, LOW);
@@ -146,20 +208,33 @@ void setup() {
   driver.voltage_power_supply = SUPPLY_VOLTAGE;
   driver.voltage_limit = VOLTAGE_LIMIT;
   driver.init(&SPI);
+  driver.setCurrentSenseGain(DRV8316_CSAGain::Gain_0V15);
+
+#if TEST_MODE == MODE_SENSING_SCOPE
+  current_sense.linkDriver(&driver);
+  _configureSAMD51VoltageSense(A0, A1, A4);
+  _configureSAMD51VMSense(A5);
+  Serial.print("current sense init: ");
+  Serial.println(current_sense.init());
+#endif
 
   motor.linkDriver(&driver);
   motor.linkSensor(&sensor);
   motor.voltage_limit = VOLTAGE_LIMIT;
   motor.voltage_sensor_align = VOLTAGE_LIMIT;
   motor.velocity_limit = 20.0f;
+#if TEST_MODE == MODE_SENSING_SCOPE
+  motor.linkCurrentSense(&current_sense);
+#endif
 
   Serial.print("driver initialized: ");
   Serial.println(driver.initialized);
 
-#if TEST_MODE == MODE_OPEN_LOOP
+#if TEST_MODE == MODE_OPEN_LOOP || TEST_MODE == MODE_SCOPE || TEST_MODE == MODE_SENSING_SCOPE
   motor.controller = MotionControlType::velocity_openloop;
   Serial.print("motor init: ");
   Serial.println(motor.init());
+  motor_start_ms = millis();
 #else
   motor.controller = MotionControlType::velocity;
   motor.init();
@@ -249,6 +324,23 @@ void loop() {
     Serial.print(motor.enabled);
     Serial.print(" status ");
     Serial.println((int)motor.motor_status);
+  }
+#elif TEST_MODE == MODE_SCOPE || TEST_MODE == MODE_SENSING_SCOPE
+  static bool motor_tripped = false;
+  if (!motor_tripped && millis() - motor_start_ms > MOTOR_RUN_TIMEOUT_MS) {
+    motor_tripped = true;
+    motor.disable();
+    digitalWrite(PIN_N_SLEEP, LOW);
+  }
+#if TEST_MODE == MODE_SENSING_SCOPE
+  _serviceSAMD51Sensing();
+#endif
+  motor.loopFOC();
+  motor.move(TARGET_VELOCITY);
+  static uint32_t last_scope = 0;
+  if (micros() - last_scope >= 10000) {
+    last_scope = micros();
+    sendScopeData();
   }
 #else
   motor.loopFOC();
