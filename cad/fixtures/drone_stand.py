@@ -52,8 +52,9 @@ class DroneStand:
     # Stator-side encoder: MicroSpora in a recess on the back of the plate.
     microspora_w: float = 33.0
     microspora_h: float = 34.0
-    microspora_pitch_x: float = 25.0  # 2 slots, 25 mm c2c
-    microspora_hole_z: float = -14.0  # below the board centre
+    microspora_pitch_x: float = 21.1  # STEP hole spacing
+    microspora_hole_x: float = -1.65  # holes are left of the board centre
+    microspora_hole_z: float = -9.94  # below the board centre
     microspora_slot_w: float = 3.1
     microspora_slot_l: float = 5.0
     microspora_offset_x: float = 0.0
@@ -139,9 +140,9 @@ def build(cfg: DroneStand = DroneStand()) -> tuple[Part, Part, Part]:
     web_t = cfg.motor_plate_t - cfg.microspora_recess_d
     for x in (-cfg.microspora_pitch_x / 2, cfg.microspora_pitch_x / 2):
         motor_plate -= Pos(
-            x + cfg.microspora_offset_x,
+            x + cfg.microspora_hole_x,
             cfg.motor_plate_t / 2 - cfg.microspora_recess_d - web_t / 2,
-            cfg.microspora_hole_z + cfg.microspora_offset_y,
+            cfg.microspora_hole_z,
         ) * slot(cfg.microspora_slot_l, cfg.microspora_slot_w, web_t + 2)
     motor_plate = Pos(0, 0, plate_z) * motor_plate
 

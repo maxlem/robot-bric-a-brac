@@ -23,8 +23,8 @@ CAD check passes.
 
 ### MicroSpora (Phase 1, #13, stator side)
 
-- [ ] Board outline: **33 × 34 mm**
-- [ ] Mounting holes: **2 × M3, 25 mm c2c** (21.981 inner / 27.994 outer)
+- [ ] Board outline: **33.2 × 31.9 mm** (STEP)
+- [ ] Mounting slots: **2 × 3.1 × 5 mm, 21.1 mm c2c**, 9.94 mm below the centre
 - [ ] MT6701 position relative to the board centre
 - [ ] USB and connector clearance
 - [ ] Magnet-to-sensor gap: 0.5–3 mm (0.7 mm in the model)
