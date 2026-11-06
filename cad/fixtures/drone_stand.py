@@ -21,7 +21,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from build123d import Box, Cylinder, Part, Pos, Rot
+from build123d import Box, Cylinder, Part, Pos, Rot, scale
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from export import export  # noqa: E402
@@ -207,19 +207,21 @@ def sensor_board_as5048a(cfg: DroneStand = DroneStand()) -> Part:
 
 
 def microspora_board(cfg: DroneStand = DroneStand()) -> Part:
-    """Real MicroSpora PCB, positioned in the recess on the back of the plate."""
+    """Real MicroSpora PCB, sensor side facing the magnet."""
     pcb = microspora.board()
     bb = pcb.bounding_box()
     cx = (bb.min.X + bb.max.X) / 2
     cy = (bb.min.Y + bb.max.Y) / 2
     cz = (bb.min.Z + bb.max.Z) / 2
-    half_t = (bb.max.Z - bb.min.Z) / 2
     plate_z = cfg.base_t + cfg.motor_plate_h / 2
-    board_y = cfg.motor_plate_t / 2 - cfg.microspora_recess_d + half_t
-    board = Rot(90, 0, 0) * pcb
+    board_y = cfg.motor_plate_t / 2 - cfg.microspora_recess_d + cz
+
+    # The sensor is on the STEP's -Z face. Flip Z, then rotate so -Z faces
+    # the magnet (-Y) and the board's height stays up (+Z).
+    board = Rot(90, 0, 0) * scale(pcb, (1, 1, -1))
     return Pos(
         -cx + cfg.microspora_offset_x,
-        board_y + cz,
+        board_y - cz,
         plate_z - cy + cfg.microspora_offset_y,
     ) * board
 
