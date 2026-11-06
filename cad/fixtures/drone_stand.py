@@ -17,7 +17,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from build123d import Box, Cylinder, Part, Pos, Rot
+from build123d import Box, Compound, Cylinder, Part, Pos, Rot
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from export import export  # noqa: E402
@@ -212,6 +212,14 @@ def microspora_components(cfg: DroneStand = DroneStand()) -> Part:
     return _place_microspora(microspora.components(), cfg)
 
 
+def microspora_populated(cfg: DroneStand = DroneStand()) -> Part:
+    """Populated MicroSpora board (PCB, U8 encoder, and all SMD components)."""
+    return _place_microspora(
+        Compound([microspora.board(), microspora.encoder(), microspora.components()]),
+        cfg,
+    )
+
+
 def magnet(cfg: DroneStand = DroneStand()) -> Part:
     """Reference diametric magnet."""
     return Rot(90, 0, 0) * Cylinder(cfg.magnet_actual_d / 2, cfg.magnet_actual_t)
@@ -254,8 +262,7 @@ def parts() -> dict[str, Part]:
         "drone_stand": stand,
         "drone_magnet_holder": holder,
         "drone_magnet": magnet(),
-        "drone_sensor_microspora": microspora_board(),
-        "drone_sensor_microspora_encoder": microspora_encoder(),
+        "drone_sensor_microspora": microspora_populated(),
     }
 
 
