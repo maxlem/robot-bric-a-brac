@@ -21,7 +21,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from build123d import Box, Cylinder, Part, Pos, Rot, scale
+from build123d import Box, Cylinder, Part, Pos, Rot
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from export import export  # noqa: E402
@@ -53,7 +53,7 @@ class DroneStand:
     microspora_w: float = 33.0
     microspora_h: float = 34.0
     microspora_pitch_x: float = 21.1  # STEP hole spacing
-    microspora_hole_x: float = -1.65  # holes are left of the board centre
+    microspora_hole_x: float = 1.65  # holes are right of the board centre
     microspora_hole_z: float = -9.94  # below the board centre
     microspora_slot_w: float = 3.1
     microspora_slot_l: float = 5.0
@@ -193,7 +193,7 @@ def build(cfg: DroneStand = DroneStand()) -> tuple[Part, Part, Part]:
         cfg.magnet_d / 2, cfg.magnet_t + 1
     )
     holder = Rot(90, 0, 0) * holder
-    holder = Pos(0, -0.45, plate_z) * holder
+    holder = Pos(0, 5.04, plate_z) * holder
 
     return stand, carrier, holder
 
@@ -207,21 +207,19 @@ def sensor_board_as5048a(cfg: DroneStand = DroneStand()) -> Part:
 
 
 def microspora_board(cfg: DroneStand = DroneStand()) -> Part:
-    """Real MicroSpora PCB, sensor side facing the magnet."""
+    """Real MicroSpora PCB, component side facing +Y (visible from behind)."""
     pcb = microspora.board()
     bb = pcb.bounding_box()
     cx = (bb.min.X + bb.max.X) / 2
     cy = (bb.min.Y + bb.max.Y) / 2
-    cz = (bb.min.Z + bb.max.Z) / 2
     plate_z = cfg.base_t + cfg.motor_plate_h / 2
-    board_y = cfg.motor_plate_t / 2 - cfg.microspora_recess_d + cz
+    recess_bottom = cfg.motor_plate_t / 2 - cfg.microspora_recess_d
 
-    # The sensor is on the STEP's -Z face. Flip Z, then rotate so -Z faces
-    # the magnet (-Y) and the board's height stays up (+Z).
-    board = Rot(90, 0, 0) * scale(pcb, (1, 1, -1))
+    # Pure rotation: +Z (component side) -> +Y, height stays up (+Z).
+    board = Rot(90, 0, 0) * Rot(0, 180, 0) * pcb
     return Pos(
-        -cx + cfg.microspora_offset_x,
-        board_y - cz,
+        cx + cfg.microspora_offset_x,
+        recess_bottom,
         plate_z - cy + cfg.microspora_offset_y,
     ) * board
 
@@ -246,17 +244,14 @@ def assembly_parts(
     ]
 
     if sensor == "microspora":
-        # Board in the recess, magnet in the plate's central hole in front.
-        magnet_y = (
-            cfg.motor_plate_t / 2
-            - cfg.microspora_recess_d
-            - 0.7
-            - cfg.magnet_actual_t / 2
-        )
+        # Component side faces +Y; magnet and holder sit behind the board.
+        board = microspora_board(cfg)
+        bb = board.bounding_box()
+        magnet_y = bb.max.Y + 0.7 + cfg.magnet_actual_t / 2
         parts += [
             ("holder", holder, "#7fc8a0"),
             ("magnet", Pos(0, magnet_y, plate_z) * magnet(cfg), "#c080d0"),
-            ("microspora", microspora_board(cfg), "#d07070"),
+            ("microspora", board, "#d07070"),
         ]
     else:
         # Magnet B on the rotor, board in the front bracket.

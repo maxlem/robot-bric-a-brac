@@ -55,8 +55,7 @@ def parts() -> dict:
 
 
 def main() -> None:
-    path = ensure()
-    print(path)
+    print(ensure())
 
 
 if __name__ == "__main__":
