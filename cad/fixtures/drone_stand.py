@@ -26,6 +26,7 @@ from build123d import Box, Cylinder, Part, Pos, Rot
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from export import export  # noqa: E402
 from fixtures import motor_5010  # noqa: E402
+from reference import microspora  # noqa: E402
 
 
 @dataclass(frozen=True)
@@ -51,9 +52,10 @@ class DroneStand:
     # Stator-side encoder: MicroSpora in a recess on the back of the plate.
     microspora_w: float = 33.0
     microspora_h: float = 34.0
-    microspora_pitch_x: float = 25.0  # 2 x M3, 25 mm c2c
+    microspora_pitch_x: float = 25.0  # 2 slots, 25 mm c2c
     microspora_hole_z: float = -14.0  # below the board centre
-    microspora_hole_d: float = 3.4  # M3 clearance
+    microspora_slot_w: float = 3.1
+    microspora_slot_l: float = 5.0
     microspora_offset_x: float = 0.0
     microspora_offset_y: float = 0.0
     microspora_recess_d: float = 1.5  # component clearance
@@ -84,6 +86,14 @@ class DroneStand:
 
     # Motor envelope: mounting face to rotor face (21.3 mm on the drawing).
     motor_height: float = 21.3
+
+
+def slot(length: float, width: float, depth: float) -> Part:
+    """A stadium-shaped slot: length along Z, width along X, depth along Y."""
+    body = Box(width, depth, length - width)
+    for z in (-(length - width) / 2, (length - width) / 2):
+        body += Pos(0, 0, z) * Rot(90, 0, 0) * Cylinder(width / 2, depth)
+    return body
 
 
 def build(cfg: DroneStand = DroneStand()) -> tuple[Part, Part, Part]:
@@ -132,9 +142,7 @@ def build(cfg: DroneStand = DroneStand()) -> tuple[Part, Part, Part]:
             x + cfg.microspora_offset_x,
             cfg.motor_plate_t / 2 - cfg.microspora_recess_d - web_t / 2,
             cfg.microspora_hole_z + cfg.microspora_offset_y,
-        ) * Rot(90, 0, 0) * Cylinder(
-            cfg.microspora_hole_d / 2, web_t + 2
-        )
+        ) * slot(cfg.microspora_slot_l, cfg.microspora_slot_w, web_t + 2)
     motor_plate = Pos(0, 0, plate_z) * motor_plate
 
     # Rotor-side bracket: a post from the base, in front of the motor.
@@ -184,7 +192,7 @@ def build(cfg: DroneStand = DroneStand()) -> tuple[Part, Part, Part]:
         cfg.magnet_d / 2, cfg.magnet_t + 1
     )
     holder = Rot(90, 0, 0) * holder
-    holder = Pos(0, -1.25, plate_z) * holder
+    holder = Pos(0, -0.45, plate_z) * holder
 
     return stand, carrier, holder
 
@@ -197,20 +205,22 @@ def sensor_board_as5048a(cfg: DroneStand = DroneStand()) -> Part:
     return board
 
 
-def sensor_board_microspora(cfg: DroneStand = DroneStand()) -> Part:
-    """Reference MicroSpora board, in the recess on the back of the plate."""
-    board = Box(cfg.microspora_w, 1.6, cfg.microspora_h)
-    chip = Box(3.0, 0.8, 3.0)
-    board += Pos(
-        cfg.microspora_offset_x, -0.8 - 0.4, cfg.microspora_offset_y
-    ) * chip
-    for x in (-cfg.microspora_pitch_x / 2, cfg.microspora_pitch_x / 2):
-        board -= Pos(
-            x + cfg.microspora_offset_x,
-            0,
-            cfg.microspora_hole_z + cfg.microspora_offset_y,
-        ) * Rot(90, 0, 0) * Cylinder(cfg.microspora_hole_d / 2, 3)
-    return board
+def microspora_board(cfg: DroneStand = DroneStand()) -> Part:
+    """Real MicroSpora PCB, positioned in the recess on the back of the plate."""
+    pcb = microspora.board()
+    bb = pcb.bounding_box()
+    cx = (bb.min.X + bb.max.X) / 2
+    cy = (bb.min.Y + bb.max.Y) / 2
+    cz = (bb.min.Z + bb.max.Z) / 2
+    half_t = (bb.max.Z - bb.min.Z) / 2
+    plate_z = cfg.base_t + cfg.motor_plate_h / 2
+    board_y = cfg.motor_plate_t / 2 - cfg.microspora_recess_d + half_t
+    board = Rot(90, 0, 0) * pcb
+    return Pos(
+        -cx + cfg.microspora_offset_x,
+        board_y + cz,
+        plate_z - cy + cfg.microspora_offset_y,
+    ) * board
 
 
 def magnet(cfg: DroneStand = DroneStand()) -> Part:
@@ -233,20 +243,17 @@ def assembly_parts(
     ]
 
     if sensor == "microspora":
-        # Board in the recess on the back of the plate, magnet in the plate's
-        # central hole in front of it.
-        board_y = (
-            cfg.motor_plate_t / 2 - cfg.microspora_recess_d + 0.8
+        # Board in the recess, magnet in the plate's central hole in front.
+        magnet_y = (
+            cfg.motor_plate_t / 2
+            - cfg.microspora_recess_d
+            - 0.7
+            - cfg.magnet_actual_t / 2
         )
-        magnet_y = -cfg.magnet_actual_t / 2
         parts += [
             ("holder", holder, "#7fc8a0"),
             ("magnet", Pos(0, magnet_y, plate_z) * magnet(cfg), "#c080d0"),
-            (
-                "microspora",
-                Pos(0, board_y, plate_z) * sensor_board_microspora(cfg),
-                "#d07070",
-            ),
+            ("microspora", microspora_board(cfg), "#d07070"),
         ]
     else:
         # Magnet B on the rotor, board in the front bracket.
@@ -282,7 +289,7 @@ def parts() -> dict[str, Part]:
         "drone_magnet_holder": holder,
         "drone_magnet": magnet(),
         "drone_sensor_as5048a": sensor_board_as5048a(),
-        "drone_sensor_microspora": sensor_board_microspora(),
+        "drone_sensor_microspora": microspora_board(),
     }
 
 
