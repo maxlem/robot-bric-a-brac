@@ -16,18 +16,21 @@ import subprocess
 import sys
 from pathlib import Path
 
-from build123d import export_stl, import_stl, import_step
+from build123d import Compound, export_stl, import_stl, import_step
 
 CAD = Path(__file__).resolve().parents[1]
 REF = CAD / "build" / "reference"
 STEP = REF / "microspora.step"
 PCB_STL = REF / "microspora_pcb.stl"
 ENC_STL = REF / "microspora_encoder.stl"
+COMP_STL = REF / "microspora_components.stl"
 
 URL = (
     "https://raw.githubusercontent.com/simplefoc/SimpleFOC-microspora/"
     "main/3d%20model/3D_MicroSpora_Board_4layer_2026-08-18.step"
 )
+
+_SKIP_PREFIXES = ("Board~", "U8~", "Top", "Bottom")
 
 
 def _find(node, prefix: str):
@@ -49,17 +52,30 @@ def _build() -> None:
 
     print("importing STEP (about 20 s)", file=sys.stderr)
     shape = import_step(str(STEP))
-    pcb = max(shape.solids(), key=lambda s: s.volume)
+    board_node = _find(shape, "Board~")
+    pcb = (
+        board_node
+        if board_node is not None
+        else max(shape.solids(), key=lambda s: s.volume)
+    )
     export_stl(pcb, str(PCB_STL))
 
-    encoder = _find(shape, "U8~")
-    if encoder is not None:
-        export_stl(encoder, str(ENC_STL))
+    encoder_node = _find(shape, "U8~")
+    if encoder_node is not None:
+        export_stl(encoder_node, str(ENC_STL))
+
+    comp_solids = []
+    for child in getattr(shape, "children", []):
+        if child.label.startswith(_SKIP_PREFIXES):
+            continue
+        comp_solids.extend(child.solids())
+    if comp_solids:
+        export_stl(Compound(comp_solids), str(COMP_STL))
 
 
 def ensure() -> Path:
     """Return the PCB STL, building it from the STEP if needed."""
-    if not PCB_STL.exists() or not ENC_STL.exists():
+    if not PCB_STL.exists() or not ENC_STL.exists() or not COMP_STL.exists():
         _build()
     return PCB_STL
 
@@ -75,13 +91,24 @@ def encoder():
     return import_stl(str(ENC_STL))
 
 
+def components():
+    """All other named SMD components as a mesh, in the STEP frame."""
+    ensure()
+    return import_stl(str(COMP_STL))
+
+
 def parts() -> dict:
-    return {"microspora_pcb": board(), "microspora_encoder": encoder()}
+    return {
+        "microspora_pcb": board(),
+        "microspora_encoder": encoder(),
+        "microspora_components": components(),
+    }
 
 
 def main() -> None:
     print(ensure())
     print(ENC_STL)
+    print(COMP_STL)
 
 
 if __name__ == "__main__":
