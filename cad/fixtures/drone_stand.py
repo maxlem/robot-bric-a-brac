@@ -53,8 +53,8 @@ class DroneStand:
     microspora_w: float = 33.0
     microspora_h: float = 34.0
     microspora_pitch_x: float = 21.1  # STEP hole spacing
-    microspora_hole_x: float = 1.65  # holes are right of the board centre
-    microspora_hole_z: float = -9.94  # below the board centre
+    microspora_hole_x: float = -1.65  # holes are left of the board centre
+    microspora_hole_z: float = 9.94  # above the board centre after the flip
     microspora_slot_w: float = 3.1
     microspora_slot_l: float = 5.0
     microspora_offset_x: float = 0.0
@@ -192,8 +192,8 @@ def build(cfg: DroneStand = DroneStand()) -> tuple[Part, Part, Part]:
     holder -= Pos(0, 0, cfg.holder_t / 2 - cfg.magnet_t / 2 + 0.5) * Cylinder(
         cfg.magnet_d / 2, cfg.magnet_t + 1
     )
-    holder = Rot(90, 0, 0) * holder
-    holder = Pos(0, 5.04, plate_z) * holder
+    holder = Rot(90, 0, 0) * Rot(0, 180, 0) * holder
+    holder = Pos(0, -1.21, plate_z) * holder
 
     return stand, carrier, holder
 
@@ -215,13 +215,31 @@ def microspora_board(cfg: DroneStand = DroneStand()) -> Part:
     plate_z = cfg.base_t + cfg.motor_plate_h / 2
     recess_bottom = cfg.motor_plate_t / 2 - cfg.microspora_recess_d
 
-    # Pure rotation: +Z (component side) -> +Y, height stays up (+Z).
-    board = Rot(90, 0, 0) * Rot(0, 180, 0) * pcb
+    # Pure rotation: +Z (component side) -> +Y, then 180 around Z to put the
+    # board's top at the top.
+    board = Rot(90, 0, 0) * Rot(0, 180, 0) * Rot(0, 0, 180) * pcb
     return Pos(
-        cx + cfg.microspora_offset_x,
+        -cx + cfg.microspora_offset_x,
         recess_bottom,
-        plate_z - cy + cfg.microspora_offset_y,
+        plate_z + cy + cfg.microspora_offset_y,
     ) * board
+
+
+def microspora_encoder(cfg: DroneStand = DroneStand()) -> Part:
+    """The MT6701 (U8) on the board, for checking the magnet alignment."""
+    pcb = microspora.board()
+    bb = pcb.bounding_box()
+    cx = (bb.min.X + bb.max.X) / 2
+    cy = (bb.min.Y + bb.max.Y) / 2
+    plate_z = cfg.base_t + cfg.motor_plate_h / 2
+    recess_bottom = cfg.motor_plate_t / 2 - cfg.microspora_recess_d
+
+    encoder = Rot(90, 0, 0) * Rot(0, 180, 0) * Rot(0, 0, 180) * microspora.encoder()
+    return Pos(
+        -cx + cfg.microspora_offset_x,
+        recess_bottom,
+        plate_z + cy + cfg.microspora_offset_y,
+    ) * encoder
 
 
 def magnet(cfg: DroneStand = DroneStand()) -> Part:
@@ -244,14 +262,17 @@ def assembly_parts(
     ]
 
     if sensor == "microspora":
-        # Component side faces +Y; magnet and holder sit behind the board.
+        # The MT6701 is on the board's -Y face, so the magnet sits between
+        # the board and the motor, inside the plate's bore.
         board = microspora_board(cfg)
         bb = board.bounding_box()
-        magnet_y = bb.max.Y + 0.7 + cfg.magnet_actual_t / 2
+        sensor_face = bb.min.Y - 0.76  # U8 protrudes 0.76 mm
+        magnet_y = sensor_face - 0.7 - cfg.magnet_actual_t / 2
         parts += [
             ("holder", holder, "#7fc8a0"),
             ("magnet", Pos(0, magnet_y, plate_z) * magnet(cfg), "#c080d0"),
             ("microspora", board, "#d07070"),
+            ("encoder", microspora_encoder(cfg), "#303030"),
         ]
     else:
         # Magnet B on the rotor, board in the front bracket.
@@ -288,6 +309,7 @@ def parts() -> dict[str, Part]:
         "drone_magnet": magnet(),
         "drone_sensor_as5048a": sensor_board_as5048a(),
         "drone_sensor_microspora": microspora_board(),
+        "drone_sensor_microspora_encoder": microspora_encoder(),
     }
 
 

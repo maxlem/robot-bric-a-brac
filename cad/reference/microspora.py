@@ -3,8 +3,9 @@
 Source: https://github.com/simplefoc/SimpleFOC-microspora/tree/main/3d%20model
 
 The STEP is 26 MB and takes ~20 s to import, so it is downloaded once to
-``cad/build/reference/`` and reduced to the PCB solid (1.6 MB STL). The
-components are dropped; the board outline, holes, and slots are kept.
+``cad/build/reference/`` and reduced to the PCB solid (1.6 MB STL) and the
+MT6701 encoder chip (U8). The other components are dropped; the board
+outline, holes, and slots are kept.
 
     cd cad && .venv/bin/python -m reference.microspora
 """
@@ -20,7 +21,8 @@ from build123d import export_stl, import_stl, import_step
 CAD = Path(__file__).resolve().parents[1]
 REF = CAD / "build" / "reference"
 STEP = REF / "microspora.step"
-STL = REF / "microspora_pcb.stl"
+PCB_STL = REF / "microspora_pcb.stl"
+ENC_STL = REF / "microspora_encoder.stl"
 
 URL = (
     "https://raw.githubusercontent.com/simplefoc/SimpleFOC-microspora/"
@@ -28,11 +30,18 @@ URL = (
 )
 
 
-def ensure() -> Path:
-    """Return the PCB STL, building it from the STEP if needed."""
-    if STL.exists():
-        return STL
+def _find(node, prefix: str):
+    """Depth-first search for a named node in the STEP tree."""
+    if node.label.startswith(prefix):
+        return node
+    for child in getattr(node, "children", []):
+        found = _find(child, prefix)
+        if found is not None:
+            return found
+    return None
 
+
+def _build() -> None:
     REF.mkdir(parents=True, exist_ok=True)
     if not STEP.exists():
         print(f"downloading {URL}", file=sys.stderr)
@@ -41,8 +50,18 @@ def ensure() -> Path:
     print("importing STEP (about 20 s)", file=sys.stderr)
     shape = import_step(str(STEP))
     pcb = max(shape.solids(), key=lambda s: s.volume)
-    export_stl(pcb, str(STL))
-    return STL
+    export_stl(pcb, str(PCB_STL))
+
+    encoder = _find(shape, "U8~")
+    if encoder is not None:
+        export_stl(encoder, str(ENC_STL))
+
+
+def ensure() -> Path:
+    """Return the PCB STL, building it from the STEP if needed."""
+    if not PCB_STL.exists() or not ENC_STL.exists():
+        _build()
+    return PCB_STL
 
 
 def board():
@@ -50,12 +69,19 @@ def board():
     return import_stl(str(ensure()))
 
 
+def encoder():
+    """The MT6701 (U8) as a mesh, in the STEP frame."""
+    ensure()
+    return import_stl(str(ENC_STL))
+
+
 def parts() -> dict:
-    return {"microspora_pcb": board()}
+    return {"microspora_pcb": board(), "microspora_encoder": encoder()}
 
 
 def main() -> None:
     print(ensure())
+    print(ENC_STL)
 
 
 if __name__ == "__main__":
