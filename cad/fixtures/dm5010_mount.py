@@ -71,6 +71,7 @@ class DM5010Mount(ParamConfig):
             "microspora_gap",
         ],
         "motor": ["dm5010.*"],
+        "motor_cap": ["dm5010.*"],
     }
 
     # Base: extends toward +Y behind the motor wall, with a front (-Y) lip
@@ -308,12 +309,14 @@ def assembly_parts(
     mount, carrier = build(cfg)
     plate_z = cfg.base_t + cfg.motor_plate_h / 2
 
-    m_part = (
-        dm5010.build(dm5010_cfg)
+    motor_body, motor_cap = (
+        dm5010.build_pair(dm5010_cfg)
         if dm5010_cfg is not None
-        else dm5010.build()
+        else dm5010.build_pair()
     )
-    motor = Pos(0, -cfg.motor_plate_t / 2, plate_z) * m_part
+    motor_pose = Pos(0, -cfg.motor_plate_t / 2, plate_z)
+    motor = motor_pose * motor_body
+    cap = motor_pose * motor_cap
     board = microspora_board(cfg)
     bb = board.bounding_box()
     sensor_face = bb.min.Y - cfg.microspora_u8_h
@@ -322,6 +325,7 @@ def assembly_parts(
     return [
         ("mount", mount, "#8fa8c8"),
         ("motor", motor, "#e0a060"),
+        ("motor_cap", cap, "#c88850"),
         ("carrier", carrier, "#7fc8a0"),
         ("magnet", Pos(0, magnet_y, plate_z) * magnet(cfg), "#c080d0"),
         ("microspora", board, "#d07070"),
