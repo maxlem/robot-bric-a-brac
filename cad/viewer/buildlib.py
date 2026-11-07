@@ -2,8 +2,8 @@
 
 Imports build123d once. ``build_all`` drops the project's modules on file-save
 rebuilds so source edits are picked up without restarting the process, and
-incrementally rebuilds only modified modules when parameter sliders or
-spreadsheet formulas are updated.
+reuses cached STL exports whenever a fixture function returns an unchanged
+``Part`` instance (via ``@functools.lru_cache``).
 
 A fixture can expose:
 
@@ -41,16 +41,8 @@ MODULES = [
 ]
 
 MATRIX = ParamMatrix()
-_MODULE_CACHE: dict[str, tuple[list[dict], list[dict]]] = {}
-_CFG_CACHE: dict[str, Any] = {}
-_MESH_CACHE: dict[str, tuple[Any, dict]] = {}
-
-_STATIC_REF_NAMES = {
-    "drone_sensor_microspora",
-    "drone_stand_microspora__microspora",
-    "drone_stand_microspora__encoder",
-    "drone_stand_microspora__components",
-}
+# full_mesh_name -> (part_object_ref, exported_metadata_dict)
+_EXPORT_CACHE: dict[str, tuple[Any, dict]] = {}
 
 
 def triangle_count(path: Path) -> int:
@@ -66,8 +58,9 @@ def _drop_project_modules() -> None:
     """Forget the project's fixture modules so the next import sees the edits."""
     for name, module in list(sys.modules.items()):
         if (
-            name in ("viewer", "params", "reference.microspora", "__main__")
+            name in ("viewer", "params", "__main__")
             or name.startswith("viewer.")
+            or name.startswith("reference.")
         ):
             continue
         path = getattr(module, "__file__", None)
@@ -91,44 +84,18 @@ def _error(module: str, name: str, started: float) -> dict:
     }
 
 
-def _ref_pose_key(cfg: Any) -> tuple[Any, ...] | None:
-    if cfg is None:
-        return None
-    fields = (
-        "base_t",
-        "motor_plate_h",
-        "motor_plate_t",
-        "microspora_recess_d",
-        "microspora_offset_x",
-        "microspora_offset_y",
-    )
-    if all(hasattr(cfg, f) for f in fields):
-        return tuple(getattr(cfg, f) for f in fields)
-    return None
-
-
-def _export(
-    module: str,
-    name: str,
-    part,
-    prefix: str = "",
-    pose_key: Any = None,
-) -> dict:
+def _export(module: str, name: str, part: Any, prefix: str = "") -> dict:
     started = time.perf_counter()
     try:
         OUT.mkdir(parents=True, exist_ok=True)
         full_name = f"{prefix}{name}"
         stl = OUT / f"{full_name}.stl"
-        if (
-            full_name in _STATIC_REF_NAMES
-            and pose_key is not None
-            and full_name in _MESH_CACHE
-            and _MESH_CACHE[full_name][0] == pose_key
-            and stl.exists()
-        ):
-            cached = dict(_MESH_CACHE[full_name][1])
-            cached["duration_ms"] = 0.0
-            return cached
+
+        cached = _EXPORT_CACHE.get(full_name)
+        if cached is not None and cached[0] is part and stl.exists():
+            info = dict(cached[1])
+            info["duration_ms"] = 0.0
+            return info
 
         export_stl(part, str(stl))
         bb = part.bounding_box()
@@ -144,22 +111,17 @@ def _export(
             "triangles": triangle_count(stl),
             "mesh": f"/api/mesh/{full_name}.stl",
         }
-        if full_name in _STATIC_REF_NAMES and pose_key is not None:
-            _MESH_CACHE[full_name] = (pose_key, dict(info))
+        _EXPORT_CACHE[full_name] = (part, dict(info))
         return info
     except Exception:
         return _error(module, name, started)
 
 
-def _export_assembly(
-    module: str, name: str, components, pose_key: Any = None
-) -> dict:
+def _export_assembly(module: str, name: str, components) -> dict:
     started = time.perf_counter()
     comps = []
     for comp_name, part, color in components:
-        info = _export(
-            module, comp_name, part, prefix=f"{name}__", pose_key=pose_key
-        )
+        info = _export(module, comp_name, part, prefix=f"{name}__")
         info["color"] = color
         comps.append(info)
 
@@ -184,51 +146,49 @@ def _export_assembly(
     }
 
 
-def _call_with_cfg(fn, cfg: Any, all_configs: dict[str, Any]):
-    if cfg is None:
-        return fn()
+def _call_with_cfg(fn, cfg: Any, configs_by_short: dict[str, Any]):
+    """Invoke ``parts`` or ``assemblies`` passing ``cfg`` and any ``<mod>_cfg``."""
     sig = inspect.signature(fn)
-    kwargs: dict[str, Any] = {}
     params = list(sig.parameters.values())
     if not params:
         return fn()
-    if "cfg" in sig.parameters:
-        kwargs["cfg"] = cfg
-    else:
-        kwargs[params[0].name] = cfg
-    if "motor_cfg" in sig.parameters and "fixtures.motor_5010" in all_configs:
-        kwargs["motor_cfg"] = all_configs["fixtures.motor_5010"]
+
+    kwargs: dict[str, Any] = {}
+    for idx, p in enumerate(params):
+        if idx == 0 or p.name == "cfg":
+            if cfg is not None:
+                kwargs[p.name] = cfg
+        elif p.name.endswith("_cfg"):
+            prefix = p.name[: -len("_cfg")]
+            for short, other_cfg in configs_by_short.items():
+                if short == prefix or short.startswith(prefix):
+                    kwargs[p.name] = other_cfg
+                    break
     return fn(**kwargs)
 
 
 def build_module(
     module_name: str,
     cfg: Any = None,
-    all_configs: dict[str, Any] | None = None,
+    configs_by_short: dict[str, Any] | None = None,
 ) -> tuple[list[dict], list[dict]]:
     started = time.perf_counter()
-    all_configs = all_configs or {}
-    pose_key = _ref_pose_key(cfg)
+    configs_by_short = configs_by_short or {}
     try:
         module = importlib.import_module(module_name)
-        parts = _call_with_cfg(module.parts, cfg, all_configs)
+        parts = _call_with_cfg(module.parts, cfg, configs_by_short)
     except Exception:
         return [_error(module_name, module_name.rsplit(".", 1)[-1], started)], []
 
-    results = [
-        _export(module_name, name, part, pose_key=pose_key)
-        for name, part in parts.items()
-    ]
+    results = [_export(module_name, name, part) for name, part in parts.items()]
 
     assemblies: list[dict] = []
     if hasattr(module, "assemblies"):
         try:
-            asm_dict = _call_with_cfg(module.assemblies, cfg, all_configs)
+            asm_dict = _call_with_cfg(module.assemblies, cfg, configs_by_short)
             for asm_name, components in asm_dict.items():
                 assemblies.append(
-                    _export_assembly(
-                        module_name, asm_name, components, pose_key=pose_key
-                    )
+                    _export_assembly(module_name, asm_name, components)
                 )
         except Exception:
             assemblies.append(_error(module_name, "assembly", started))
@@ -246,8 +206,7 @@ def build_all(
 
     if reload_modules:
         _drop_project_modules()
-        _MODULE_CACHE.clear()
-        _CFG_CACHE.clear()
+        _EXPORT_CACHE.clear()
 
     module_classes: dict[str, type] = {}
     for module_name in MODULES:
@@ -263,8 +222,7 @@ def build_all(
         MATRIX.apply_mutation(param_mutation, module_classes=module_classes)
         if param_mutation.get("action") == "sync_python":
             _drop_project_modules()
-            _MODULE_CACHE.clear()
-            _CFG_CACHE.clear()
+            _EXPORT_CACHE.clear()
             module_classes.clear()
             for module_name in MODULES:
                 try:
@@ -276,29 +234,17 @@ def build_all(
                     pass
 
     configs, params_state = MATRIX.evaluate(module_classes)
+    configs_by_short = {
+        full.rsplit(".", 1)[-1]: c for full, c in configs.items()
+    }
 
     parts: list[dict] = []
     assemblies: list[dict] = []
     for module_name in MODULES:
         cfg = configs.get(module_name)
-        if module_name == "fixtures.drone_stand":
-            cache_sig = (cfg, configs.get("fixtures.motor_5010"))
-        else:
-            cache_sig = (cfg,)
-
-        if (
-            not reload_modules
-            and module_name in _MODULE_CACHE
-            and _CFG_CACHE.get(module_name) == cache_sig
-        ):
-            module_parts, module_assemblies = _MODULE_CACHE[module_name]
-        else:
-            module_parts, module_assemblies = build_module(
-                module_name, cfg=cfg, all_configs=configs
-            )
-            _MODULE_CACHE[module_name] = (module_parts, module_assemblies)
-            _CFG_CACHE[module_name] = cache_sig
-
+        module_parts, module_assemblies = build_module(
+            module_name, cfg=cfg, configs_by_short=configs_by_short
+        )
         parts.extend(module_parts)
         assemblies.extend(module_assemblies)
 

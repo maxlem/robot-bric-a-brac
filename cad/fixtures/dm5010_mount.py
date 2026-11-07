@@ -9,6 +9,7 @@ MT6701 position on the board before printing.
 
 from __future__ import annotations
 
+import functools
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -72,6 +73,7 @@ class DM5010Mount(ParamConfig):
     shaft_d: float = 8.1
 
 
+@functools.lru_cache(maxsize=8)
 def build(cfg: DM5010Mount = DM5010Mount()) -> tuple[Part, Part]:
     # Base with a clamp slot.
     base = Pos(0, 0, cfg.base_t / 2) * Box(cfg.base_w, cfg.base_d, cfg.base_t)
