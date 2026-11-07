@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>CAD viewer</title>
-    <link rel="stylesheet" href="/static/style.css" />
+    <link rel="stylesheet" href="/static/style.css?v=2" />
     <script type="importmap">
       {
         "imports": {
@@ -23,8 +23,25 @@
         </header>
         <div id="summary" class="summary">waiting for the first build&hellip;</div>
         <ul id="parts"></ul>
+        <div id="clip-panel" class="clip-panel">
+          <div class="clip-row">
+            <span class="clip-label">Section</span>
+            <div class="clip-axes" role="group" aria-label="Section axis">
+              <button type="button" class="clip-btn active" data-axis="off">Off</button>
+              <button type="button" class="clip-btn" data-axis="x">X</button>
+              <button type="button" class="clip-btn" data-axis="y">Y</button>
+              <button type="button" class="clip-btn" data-axis="z">Z</button>
+            </div>
+            <button type="button" id="clip-flip" class="clip-btn" title="Flip section side">&plusmn;</button>
+          </div>
+          <div id="clip-slider-row" class="clip-slider-row hidden">
+            <input type="range" id="clip-slider" min="-1" max="1" step="0.005" value="0" />
+            <span id="clip-val" class="clip-val">0.0 mm</span>
+          </div>
+        </div>
         <footer>
           <button id="rebuild">Rebuild</button>
+          <button id="fit" title="Reset camera to fit scene">Fit</button>
           <label class="toggle">
             <input type="checkbox" id="wireframe" />
             wireframe
@@ -40,6 +57,6 @@
         </div>
       </main>
     </div>
-    <script type="module" src="/static/app.js"></script>
+    <script type="module" src="/static/app.js?v=2"></script>
   </body>
 </html>
