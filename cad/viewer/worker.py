@@ -3,7 +3,8 @@
 Imports build123d once, then rebuilds on request. The server talks to it over
 newline-delimited JSON on stdin/stdout:
 
-    {"cmd": "build"}  ->  one line of state JSON
+    {"cmd": "build"}                       ->  full rebuild (drops cached modules)
+    {"cmd": "params", "payload": {...}}    ->  incremental parameter/formula rebuild
     {"cmd": "quit"}
 """
 
@@ -24,10 +25,19 @@ def main() -> None:
             command = json.loads(line)
         except ValueError:
             continue
-        if command.get("cmd") == "quit":
+        cmd = command.get("cmd")
+        if cmd == "quit":
             break
-        if command.get("cmd") == "build":
-            print(json.dumps(build_all()), flush=True)
+        if cmd == "build":
+            print(json.dumps(build_all(reload_modules=True)), flush=True)
+        elif cmd == "params":
+            payload = command.get("payload") or {}
+            print(
+                json.dumps(
+                    build_all(reload_modules=False, param_mutation=payload)
+                ),
+                flush=True,
+            )
 
 
 if __name__ == "__main__":

@@ -17,10 +17,24 @@ from build123d import Box, Cylinder, Part, Pos, Rot
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from export import export  # noqa: E402
+from params import ParamConfig  # noqa: E402
 
 
 @dataclass(frozen=True)
-class DM5010Mount:
+class DM5010Mount(ParamConfig):
+    BINDINGS = {
+        "board_pitch_x": "= board_w - 5.0",
+        "board_pitch_y": "= board_h - 5.0",
+    }
+    PART_GROUPS = {
+        "dm5010_mount": [
+            "Base",
+            "Riser and motor plate",
+            "DM5010 interface",
+            "MicroSpora",
+        ],
+        "dm5010_magnet_carrier": ["Magnet carrier"],
+    }
     # Base.
     base_w: float = 80.0
     base_d: float = 60.0
@@ -112,9 +126,9 @@ def build(cfg: DM5010Mount = DM5010Mount()) -> tuple[Part, Part]:
     return mount, carrier
 
 
-def parts() -> dict[str, Part]:
+def parts(cfg: DM5010Mount = DM5010Mount()) -> dict[str, Part]:
     """Named parts, for the viewer and the exporter."""
-    mount, carrier = build()
+    mount, carrier = build(cfg)
     return {"dm5010_mount": mount, "dm5010_magnet_carrier": carrier}
 
 

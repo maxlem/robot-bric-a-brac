@@ -12,6 +12,7 @@ Local frame: the mounting face is at y = 0 and the motor extends toward -Y.
 
 from __future__ import annotations
 
+import functools
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,10 +20,11 @@ from pathlib import Path
 from build123d import Cylinder, Part, Pos, Rot
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from params import ParamConfig  # noqa: E402
 
 
 @dataclass(frozen=True)
-class Motor5010:
+class Motor5010(ParamConfig):
     boss_d: float = 25.0
     boss_h: float = 10.0
     stator_d: float = 50.0
@@ -44,6 +46,7 @@ class Motor5010:
         return self.boss_h + self.flange_t + self.bell_h
 
 
+@functools.lru_cache(maxsize=8)
 def build(cfg: Motor5010 = Motor5010()) -> Part:
     # Stator boss, y = -boss_h .. 0. The plate sits on its end face.
     boss = Pos(0, -cfg.boss_h / 2, 0) * Rot(90, 0, 0) * Cylinder(
@@ -97,8 +100,8 @@ def build(cfg: Motor5010 = Motor5010()) -> Part:
     return motor
 
 
-def parts() -> dict[str, Part]:
-    return {"motor_5010": build()}
+def parts(cfg: Motor5010 = Motor5010()) -> dict[str, Part]:
+    return {"motor_5010": build(cfg)}
 
 
 def main() -> None:
