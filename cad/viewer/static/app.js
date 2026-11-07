@@ -10,6 +10,12 @@ const partsList = document.getElementById("parts");
 const summary = document.getElementById("summary");
 const conn = document.getElementById("conn");
 const wireframe = document.getElementById("wireframe");
+const fitBtn = document.getElementById("fit");
+const clipSliderRow = document.getElementById("clip-slider-row");
+const clipSlider = document.getElementById("clip-slider");
+const clipVal = document.getElementById("clip-val");
+const clipFlipBtn = document.getElementById("clip-flip");
+const clipAxisBtns = document.querySelectorAll(".clip-axes .clip-btn");
 
 const params = new URLSearchParams(location.search);
 if (params.get("wireframe") === "1") wireframe.checked = true;
@@ -19,6 +25,7 @@ if (params.get("wireframe") === "1") wireframe.checked = true;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setClearColor(0x0e1116);
+renderer.localClippingEnabled = true;
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 10000);
@@ -60,10 +67,22 @@ scene.add(group);
 
 const loader = new STLLoader();
 let loaded = [];
+let loadedGeometries = [];
 let current = null;
 let lastBuiltAt = 0;
+let lastFittedKey = null;
+let lastSceneCenter = new THREE.Vector3();
+let sceneBounds = new THREE.Box3();
 let loadGeneration = 0;
 let state = { parts: [], assemblies: [], duration_ms: 0, built_at: 0 };
+
+// Per-component state across hot-reloads: key -> { hidden: bool, ghost: bool }
+const compState = new Map();
+
+// Section clipping plane state
+let clipAxis = params.get("clip") || "off";
+let clipFlip = params.get("clip_flip") === "1" ? -1 : 1;
+const clipPlane = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0);
 
 // --- scene management ----------------------------------------------------
 
@@ -74,63 +93,149 @@ function clearScene() {
     mesh.material.dispose();
   }
   loaded = [];
-  group.position.set(0, 0, 0);
+  loadedGeometries = [];
 }
 
-function makeMaterial(color) {
+function getCompKey(assemblyName, compName) {
+  return `${assemblyName}__${compName}`;
+}
+
+function getCompOpts(assemblyName, compName) {
+  const key = getCompKey(assemblyName, compName);
+  if (!compState.has(key)) {
+    compState.set(key, { hidden: false, ghost: false });
+  }
+  return compState.get(key);
+}
+
+function makeMaterial(color, ghost = false) {
   return new THREE.MeshStandardMaterial({
     color: new THREE.Color(color || "#9fb4d0"),
     metalness: 0.15,
     roughness: 0.55,
     wireframe: wireframe.checked,
+    transparent: ghost,
+    opacity: ghost ? 0.25 : 1.0,
+    depthWrite: !ghost,
+    side: THREE.DoubleSide,
+    clippingPlanes: clipAxis === "off" ? [] : [clipPlane],
+    clipShadows: true,
   });
 }
 
-function addMesh(geometry, color) {
+function addMesh(geometry, color, compKey = null, ghost = false, hidden = false) {
   geometry.computeVertexNormals();
-  const mesh = new THREE.Mesh(geometry, makeMaterial(color));
+  const mesh = new THREE.Mesh(geometry, makeMaterial(color, ghost));
+  mesh.visible = !hidden;
+  mesh.userData.compKey = compKey;
+  mesh.userData.baseColor = color;
   group.add(mesh);
   loaded.push(mesh);
   return mesh;
 }
 
-function fitScene(geometries) {
+function computeBounds(geometries) {
   const box = new THREE.Box3();
   for (const geometry of geometries) {
     geometry.computeBoundingBox();
     box.union(geometry.boundingBox);
   }
-  const center = box.getCenter(new THREE.Vector3());
-  const size = box.getSize(new THREE.Vector3());
-  const radius = Math.max(size.length() / 2, 1);
+  return box;
+}
 
-  // Centre the whole scene, not each component.
-  group.position.set(-center.x, -center.y, -center.z);
-  grid.position.set(0, 0, -size.z / 2);
-  axes.position.set(0, 0, -size.z / 2);
+function placeScene(geometries, resetCamera = false) {
+  sceneBounds = computeBounds(geometries);
+  const size = sceneBounds.getSize(new THREE.Vector3());
 
-  const distance =
-    (radius / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2))) * 1.15;
-  const direction = new THREE.Vector3(1, -1.2, 0.8).normalize();
-  camera.position.copy(direction.multiplyScalar(distance));
-  camera.near = Math.max(0.1, distance / 100);
-  camera.far = distance * 20;
-  camera.updateProjectionMatrix();
-  controls.target.set(0, 0, 0);
-  controls.update();
+  if (resetCamera || !lastFittedKey) {
+    lastSceneCenter = sceneBounds.getCenter(new THREE.Vector3());
+    const radius = Math.max(size.length() / 2, 1);
+
+    group.position.set(
+      -lastSceneCenter.x,
+      -lastSceneCenter.y,
+      -lastSceneCenter.z,
+    );
+    grid.position.set(0, 0, -size.z / 2);
+    axes.position.set(0, 0, -size.z / 2);
+
+    const distance =
+      (radius / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2))) * 1.15;
+    const direction = new THREE.Vector3(1, -1.2, 0.8).normalize();
+    camera.position.copy(direction.multiplyScalar(distance));
+    camera.near = Math.max(0.1, distance / 100);
+    camera.far = distance * 20;
+    camera.updateProjectionMatrix();
+    controls.target.set(0, 0, 0);
+    controls.update();
+  } else {
+    // Keep exact camera orbit and reference center on hot-reload
+    group.position.set(
+      -lastSceneCenter.x,
+      -lastSceneCenter.y,
+      -lastSceneCenter.z,
+    );
+  }
+
+  updateClippingPlane();
+}
+
+function updateClippingPlane() {
+  const active = clipAxis !== "off";
+  clipSliderRow.classList.toggle("hidden", !active);
+  for (const btn of clipAxisBtns) {
+    btn.classList.toggle("active", btn.dataset.axis === clipAxis);
+  }
+  clipFlipBtn.classList.toggle("active", clipFlip < 0);
+
+  for (const mesh of loaded) {
+    mesh.material.clippingPlanes = active ? [clipPlane] : [];
+    mesh.material.needsUpdate = true;
+  }
+
+  if (!active || sceneBounds.isEmpty()) return;
+
+  const axisIdx = clipAxis === "x" ? "x" : clipAxis === "y" ? "y" : "z";
+  const minVal = sceneBounds.min[axisIdx];
+  const maxVal = sceneBounds.max[axisIdx];
+  const midVal = (minVal + maxVal) / 2;
+  const halfSpan = Math.max((maxVal - minVal) / 2, 0.5);
+
+  // Slider is normalized in [-1, 1] across the CAD bounding box along axisIdx
+  const norm = parseFloat(clipSlider.value) || 0;
+  const cadCoord = midVal + norm * halfSpan;
+  clipVal.textContent = `${cadCoord.toFixed(1)} mm`;
+
+  // World coordinate = cadCoord - lastSceneCenter[axisIdx]
+  const worldCoord = cadCoord - lastSceneCenter[axisIdx];
+  const normal = new THREE.Vector3(
+    clipAxis === "x" ? -clipFlip : 0,
+    clipAxis === "y" ? -clipFlip : 0,
+    clipAxis === "z" ? -clipFlip : 0,
+  );
+  // Plane equation: normal · p + constant >= 0 is kept
+  clipPlane.set(normal, clipFlip * worldCoord);
 }
 
 // --- loading -------------------------------------------------------------
 
+function selectionKey() {
+  return current ? `${current.type}:${current.name}` : null;
+}
+
 function loadPart(part) {
   const generation = ++loadGeneration;
+  const key = selectionKey();
+  const shouldFit = key !== lastFittedKey;
   clearScene();
   loader.load(
     `${part.mesh}?t=${Date.now()}`,
     (geometry) => {
       if (generation !== loadGeneration) return;
       addMesh(geometry, part.color);
-      fitScene([geometry]);
+      loadedGeometries = [geometry];
+      placeScene(loadedGeometries, shouldFit);
+      lastFittedKey = key;
       updateHud(part);
     },
     undefined,
@@ -140,6 +245,8 @@ function loadPart(part) {
 
 function loadAssembly(assembly) {
   const generation = ++loadGeneration;
+  const key = selectionKey();
+  const shouldFit = key !== lastFittedKey;
   clearScene();
   const geometries = [];
   const components = assembly.components.filter((c) => c.status === "ok");
@@ -147,20 +254,38 @@ function loadAssembly(assembly) {
 
   let pending = components.length;
   for (const component of components) {
+    const opts = getCompOpts(assembly.name, component.name);
+    const compKey = getCompKey(assembly.name, component.name);
     loader.load(
       `${component.mesh}?t=${Date.now()}`,
       (geometry) => {
         if (generation !== loadGeneration) return;
-        addMesh(geometry, component.color);
+        addMesh(geometry, component.color, compKey, opts.ghost, opts.hidden);
         geometries.push(geometry);
         if (--pending === 0) {
-          fitScene(geometries);
+          loadedGeometries = geometries;
+          placeScene(loadedGeometries, shouldFit);
+          lastFittedKey = key;
           updateHud(assembly);
         }
       },
       undefined,
       (err) => showError(`Could not load ${component.name}\n\n${err}`),
     );
+  }
+}
+
+function applyCompVisuals(assemblyName, compName) {
+  const key = getCompKey(assemblyName, compName);
+  const opts = getCompOpts(assemblyName, compName);
+  for (const mesh of loaded) {
+    if (mesh.userData.compKey === key) {
+      mesh.visible = !opts.hidden;
+      mesh.material.transparent = opts.ghost;
+      mesh.material.opacity = opts.ghost ? 0.25 : 1.0;
+      mesh.material.depthWrite = !opts.ghost;
+      mesh.material.needsUpdate = true;
+    }
   }
 }
 
@@ -208,8 +333,9 @@ function renderSidebar() {
     partsList.appendChild(header);
 
     for (const item of items) {
+      const active = isActive(type, item.name);
       const li = document.createElement("li");
-      li.className = "part" + (isActive(type, item.name) ? " active" : "");
+      li.className = "part" + (active ? " active" : "");
       li.dataset.status = item.status;
 
       const meta =
@@ -238,6 +364,54 @@ function renderSidebar() {
       });
 
       partsList.appendChild(li);
+
+      if (active && type === "assembly" && item.components) {
+        const compUl = document.createElement("ul");
+        compUl.className = "comp-list";
+        for (const comp of item.components) {
+          const opts = getCompOpts(item.name, comp.name);
+          const compLi = document.createElement("li");
+          compLi.className = "comp-item" + (opts.hidden ? " is-hidden" : "");
+
+          const swatch = document.createElement("span");
+          swatch.className = "comp-swatch";
+          swatch.style.background = comp.color || "#9fb4d0";
+
+          const cname = document.createElement("span");
+          cname.className = "comp-name";
+          cname.textContent = comp.name;
+
+          const ghostBtn = document.createElement("button");
+          ghostBtn.type = "button";
+          ghostBtn.className = "comp-btn" + (opts.ghost ? " active" : "");
+          ghostBtn.title = "Toggle ghost (25% opacity)";
+          ghostBtn.textContent = "ghost";
+          ghostBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            opts.ghost = !opts.ghost;
+            ghostBtn.classList.toggle("active", opts.ghost);
+            applyCompVisuals(item.name, comp.name);
+          });
+
+          const hideBtn = document.createElement("button");
+          hideBtn.type = "button";
+          hideBtn.className = "comp-btn" + (opts.hidden ? " active" : "");
+          hideBtn.title = "Hide / show component";
+          hideBtn.textContent = opts.hidden ? "show" : "hide";
+          hideBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            opts.hidden = !opts.hidden;
+            hideBtn.classList.toggle("active", opts.hidden);
+            hideBtn.textContent = opts.hidden ? "show" : "hide";
+            compLi.classList.toggle("is-hidden", opts.hidden);
+            applyCompVisuals(item.name, comp.name);
+          });
+
+          compLi.append(swatch, cname, ghostBtn, hideBtn);
+          compUl.appendChild(compLi);
+        }
+        partsList.appendChild(compUl);
+      }
     }
   };
 
@@ -347,8 +521,34 @@ document.getElementById("rebuild").addEventListener("click", () => {
   fetch("/api/rebuild", { method: "POST" });
 });
 
+fitBtn.addEventListener("click", () => {
+  if (loadedGeometries.length) {
+    placeScene(loadedGeometries, true);
+  }
+});
+
 wireframe.addEventListener("change", () => {
   for (const mesh of loaded) mesh.material.wireframe = wireframe.checked;
+});
+
+for (const btn of clipAxisBtns) {
+  btn.addEventListener("click", () => {
+    const nextAxis = btn.dataset.axis;
+    if (clipAxis !== nextAxis) {
+      clipAxis = nextAxis;
+      clipSlider.value = "0";
+    }
+    updateClippingPlane();
+  });
+}
+
+clipFlipBtn.addEventListener("click", () => {
+  clipFlip = -clipFlip;
+  updateClippingPlane();
+});
+
+clipSlider.addEventListener("input", () => {
+  updateClippingPlane();
 });
 
 // --- loop ----------------------------------------------------------------

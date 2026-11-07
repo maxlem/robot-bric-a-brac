@@ -168,9 +168,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
         if path == "/":
-            self._file(STATIC / "index.html", "text/html; charset=utf-8")
+            self._file(STATIC / "index.html", "text/html; charset=utf-8", cache=False)
         elif path.startswith("/static/"):
-            self._file(STATIC / Path(path[len("/static/") :]).name)
+            self._file(STATIC / Path(path[len("/static/") :]).name, cache=False)
         elif path == "/api/state":
             self._json(self.builder.state)
         elif path == "/api/events":

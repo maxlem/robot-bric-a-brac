@@ -141,6 +141,120 @@ body {
   font-size: 11px;
 }
 
+.comp-list {
+  list-style: none;
+  margin: 2px 0 6px 14px;
+  padding: 0 0 0 8px;
+  border-left: 1px solid var(--line);
+}
+
+.comp-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  font-size: 11px;
+  color: var(--text);
+  border-radius: 4px;
+}
+
+.comp-item.is-hidden .comp-name {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.comp-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.comp-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comp-btn {
+  padding: 1px 5px;
+  font-size: 10px;
+  line-height: 1.2;
+  border-radius: 4px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.comp-btn:hover {
+  border-color: var(--line);
+  color: var(--text);
+}
+
+.comp-btn.active {
+  background: #223047;
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.clip-panel {
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.clip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.clip-label {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  flex: 1;
+}
+
+.clip-axes {
+  display: flex;
+  gap: 3px;
+}
+
+.clip-btn {
+  padding: 3px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+}
+
+.clip-btn.active {
+  background: #223047;
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.clip-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#clip-slider {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.clip-val {
+  width: 58px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--muted);
+}
+
 #sidebar footer {
   display: flex;
   align-items: center;
