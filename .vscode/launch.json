@@ -1,0 +1,32 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "CAD: build",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "viewer.build",
+      "cwd": "${workspaceFolder}/cad",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "CAD: viewer server",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "viewer.server",
+      "cwd": "${workspaceFolder}/cad",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "CAD: drone stand",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "fixtures.drone_stand",
+      "cwd": "${workspaceFolder}/cad",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    }
+  ]
+}

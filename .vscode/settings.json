@@ -5,5 +5,7 @@
     "**/.pio/**": true,
     "**/.git/objects/**": true
   },
-  "platformio-ide.activateProjectOnTextEditorChange": true
+  "platformio-ide.activateProjectOnTextEditorChange": true,
+  "workbench.browser.openLocalhostLinks": false,
+  "workbench.externalBrowser": "/usr/bin/google-chrome"
 }
