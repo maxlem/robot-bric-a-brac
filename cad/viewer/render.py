@@ -31,6 +31,7 @@ COLORS = {
     "drone_magnet": "#c080d0",
     "drone_sensor_as5048a": "#d07070",
     "drone_sensor_microspora": "#d07070",
+    "dm5010": "#e0a060",
     "dm5010_mount": "#8fa8c8",
     "dm5010_magnet_carrier": "#7fc8a0",
 }

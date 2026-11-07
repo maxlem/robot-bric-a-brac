@@ -37,6 +37,7 @@ OUT = CAD / "build" / "viewer"
 MODULES = [
     "fixtures.flycat_5010",
     "fixtures.drone_stand",
+    "fixtures.dm5010",
     "fixtures.dm5010_mount",
 ]
 

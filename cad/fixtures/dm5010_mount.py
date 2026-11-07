@@ -3,8 +3,8 @@
 Holds a DM5010 with the shaft horizontal and positions the MicroSpora so its
 onboard MT6701 is centred on the magnet.
 
-Dimensions are first-draft. Confirm the MicroSpora hole pattern and the
-MT6701 position on the board before printing.
+Dimensions use the DM5010-BGC-DRV (Ø12.7 mm slip-ring bore, 20 × 20 mm M2.5
+stator pattern) reference model in ``fixtures/dm5010.py``.
 """
 
 from __future__ import annotations
@@ -18,12 +18,16 @@ from build123d import Box, Cylinder, Part, Pos, Rot
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from export import export  # noqa: E402
+from fixtures import dm5010  # noqa: E402
 from params import ParamConfig  # noqa: E402
 
 
 @dataclass(frozen=True)
 class DM5010Mount(ParamConfig):
     BINDINGS = {
+        "motor_pitch": "= dm5010.stator_pitch",
+        "motor_bore": "= dm5010.bore_d + 1.0",
+        "shaft_d": "= dm5010.bore_d",
         "board_pitch_x": "= board_w - 5.0",
         "board_pitch_y": "= board_h - 5.0",
     }
@@ -40,7 +44,17 @@ class DM5010Mount(ParamConfig):
             "DM5010 interface",
             "MicroSpora",
         ],
+        "mount": [
+            "Base",
+            "Riser and motor plate",
+            "DM5010 interface",
+            "MicroSpora",
+        ],
         "dm5010_magnet_carrier": ["Magnet carrier"],
+        "carrier": ["Magnet carrier"],
+    }
+    PART_FIELDS = {
+        "motor": ["dm5010.*"],
     }
     # Base.
     base_w: float = 80.0
@@ -57,12 +71,12 @@ class DM5010Mount(ParamConfig):
     motor_plate_h: float = 50.0
     motor_plate_t: float = 6.0
 
-    # DM5010 interface. 4 x M2.5 on a 20.4 mm pattern, 8.1 mm bore.
-    motor_pitch: float = 20.4
+    # DM5010 interface. 4 x M2.5 on a 20.0 x 20.0 mm square, 12.7 mm slip-ring bore.
+    motor_pitch: float = 20.0
     motor_hole_d: float = 2.9  # M2.5 clearance
-    motor_bore: float = 10.0
+    motor_bore: float = 13.7  # clears Ø12.7 mm hollow slip-ring bore
 
-    # MicroSpora. TODO: measure the hole pattern and the MT6701 position.
+    # MicroSpora.
     board_w: float = 33.0
     board_h: float = 34.0
     board_pitch_x: float = 28.0
@@ -73,10 +87,13 @@ class DM5010Mount(ParamConfig):
     sensor_opening: float = 8.0
     sensor_gap: float = 1.5
 
-    # Magnet carrier.
+    # Magnet carrier: stepped plug that press-fits the Ø12.7 mm hollow bore and
+    # holds the Ø6 mm diametric magnet on the axis.
     magnet_d: float = 6.2
     magnet_t: float = 2.5
-    shaft_d: float = 8.1
+    shaft_d: float = 12.7
+    carrier_depth: float = 5.0
+    carrier_flange_t: float = 1.5
 
 
 @functools.lru_cache(maxsize=8)
@@ -125,13 +142,57 @@ def build(cfg: DM5010Mount = DM5010Mount()) -> tuple[Part, Part]:
 
     mount = base + riser + motor_plate + board_plate + post
 
-    # Magnet carrier: press-fits the 8.1 mm bore, holds the magnet on the
-    # sensor side.
-    carrier = Cylinder(cfg.magnet_d / 2 + 2, cfg.magnet_t + 2)
-    carrier -= Cylinder(cfg.shaft_d / 2, cfg.magnet_t + 4)
-    carrier -= Pos(0, 0, cfg.magnet_t / 2) * Cylinder(cfg.magnet_d / 2, cfg.magnet_t + 2)
+    # Magnet carrier: stepped plug that press-fits into the Ø12.7 mm hollow bore
+    # and holds the Ø6 mm diametric magnet on the +Z (sensor) face.
+    total_h = cfg.carrier_depth + cfg.carrier_flange_t
+    plug = Pos(0, 0, -cfg.carrier_flange_t / 2) * Cylinder(
+        cfg.shaft_d / 2, cfg.carrier_depth
+    )
+    flange = Pos(0, 0, cfg.carrier_depth / 2) * Cylinder(
+        cfg.shaft_d / 2 + 1.0, cfg.carrier_flange_t
+    )
+    carrier = plug + flange
+    carrier -= Pos(0, 0, total_h / 2 - cfg.magnet_t / 2 + 0.1) * Cylinder(
+        cfg.magnet_d / 2, cfg.magnet_t + 0.2
+    )
 
     return mount, carrier
+
+
+def assembly_parts(
+    cfg: DM5010Mount = DM5010Mount(),
+    dm5010_cfg: dm5010.DM5010 | None = None,
+) -> list[tuple[str, Part, str]]:
+    """Mount, DM5010 motor, and hollow-bore magnet carrier in working positions."""
+    mount, carrier = build(cfg)
+    riser_y = cfg.base_d / 2 - cfg.riser_d / 2
+    plate_y = riser_y - cfg.riser_d / 2 - cfg.motor_plate_t / 2
+    plate_z = cfg.base_t + cfg.riser_h - cfg.motor_plate_h / 2
+    motor_front_y = plate_y - cfg.motor_plate_t / 2
+
+    m_part = (
+        dm5010.build(dm5010_cfg)
+        if dm5010_cfg is not None
+        else dm5010.build()
+    )
+    motor_placed = Pos(0, motor_front_y, plate_z) * m_part
+    carrier_placed = (
+        Pos(0, motor_front_y, plate_z) * Rot(-90, 0, 0) * carrier
+    )
+    return [
+        ("mount", mount, "#8fa8c8"),
+        ("motor", motor_placed, "#e0a060"),
+        ("carrier", carrier_placed, "#7fc8a0"),
+    ]
+
+
+def assemblies(
+    cfg: DM5010Mount = DM5010Mount(),
+    dm5010_cfg: dm5010.DM5010 | None = None,
+) -> dict[str, list[tuple[str, Part, str]]]:
+    return {
+        "dm5010_mount_assembly": assembly_parts(cfg, dm5010_cfg=dm5010_cfg),
+    }
 
 
 def parts(cfg: DM5010Mount = DM5010Mount()) -> dict[str, Part]:
