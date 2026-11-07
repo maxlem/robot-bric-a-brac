@@ -438,6 +438,13 @@ button:hover {
 .preset-bar {
   display: flex;
   align-items: center;
+  gap: 5px;
+}
+
+#toggle-consts-btn.active {
+  background: #1f2937;
+  border-color: #4b5563;
+  color: #e5e7eb;
 }
 
 .preset-select {
@@ -588,6 +595,61 @@ button:hover {
 
 .param-row.is-bound {
   background: rgba(192, 132, 252, 0.04);
+}
+
+.param-row.is-constant {
+  background: rgba(125, 136, 153, 0.04);
+}
+
+.param-row.is-constant.is-locked .param-name-btn {
+  color: #9ca8ba;
+}
+
+.param-row.is-constant.is-locked .expr-input {
+  color: var(--muted);
+  background: #11151c;
+  border-color: #1c222b;
+  cursor: not-allowed;
+}
+
+.const-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(125, 136, 153, 0.1);
+  border: 1px solid rgba(125, 136, 153, 0.25);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.const-badge .const-val {
+  color: #b8c2d0;
+  font-weight: 500;
+}
+
+.lock-btn {
+  padding: 1px 5px;
+  font-size: 10px;
+  line-height: 1.1;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.lock-btn:hover {
+  border-color: var(--line);
+  color: #fff;
+}
+
+.lock-btn.unlocked {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.1);
 }
 
 .param-row.has-error {

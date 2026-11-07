@@ -14,6 +14,7 @@ const paramSavePresetBtn = document.getElementById("param-save-preset-btn");
 const paramSyncPyBtn = document.getElementById("param-sync-py-btn");
 const paramResetAllBtn = document.getElementById("param-reset-all-btn");
 const paramTabs = document.getElementById("param-tabs");
+const toggleConstsBtn = document.getElementById("toggle-consts-btn");
 const presetSelect = document.getElementById("preset-select");
 const paramPresetForm = document.getElementById("param-preset-form");
 const presetNameInput = document.getElementById("preset-name-input");
@@ -28,6 +29,8 @@ const paramSheet = document.getElementById("param-sheet");
 const paramHint = document.getElementById("param-hint");
 
 let paramFilterText = "";
+let showConstants = true;
+const unlockedConstants = new Set(); // keys of constant rows temporarily unlocked by user
 let lastFocusedExprInput = null;
 let lastRenderedTabSignature = "";
 const rowDomMap = new Map();
@@ -171,6 +174,9 @@ function getVisibleSections() {
     if (!modInfo) continue;
     const byGroup = new Map();
     for (const f of modInfo.fields) {
+      if (!showConstants && f.is_constant && !f.is_modified) {
+        continue;
+      }
       if (scopedKeyList && !scopedKeyList.has(f.key)) {
         continue;
       }
@@ -200,11 +206,23 @@ function getVisibleSections() {
   return sections;
 }
 
+function isConstantLocked(field) {
+  return !!field.is_constant && !unlockedConstants.has(field.key);
+}
+
 function updateRowInPlace(entry, field) {
   const { rowEl, exprInput, controlCell, actCell, docEl } = entry;
+  const locked = isConstantLocked(field);
   rowEl.classList.toggle("is-modified", !!field.is_modified);
   rowEl.classList.toggle("is-bound", !!field.is_bound);
+  rowEl.classList.toggle("is-constant", !!field.is_constant);
+  rowEl.classList.toggle("is-locked", locked);
   rowEl.classList.toggle("has-error", !!field.error);
+
+  exprInput.readOnly = locked;
+  exprInput.title = locked
+    ? "Hardware constant (click the lock icon on the right to unlock and edit)"
+    : "";
 
   if (docEl) {
     docEl.textContent = field.doc || "";
@@ -219,7 +237,9 @@ function updateRowInPlace(entry, field) {
     ? "error"
     : field.is_bound
       ? "bound"
-      : field.type;
+      : locked
+        ? "constant_locked"
+        : field.type;
 
   if (entry.mode !== desiredMode) {
     buildControlCell(entry, field);
@@ -238,6 +258,9 @@ function updateRowInPlace(entry, field) {
         `Bound formula: ${field.expr}` +
         (field.deps?.length ? `\nDepends on: ${field.deps.join(", ")}` : "");
     }
+  } else if (desiredMode === "constant_locked") {
+    const valSpan = controlCell.querySelector(".const-val");
+    if (valSpan) valSpan.textContent = formatParamValue(field);
   } else if (desiredMode === "float" || desiredMode === "int") {
     const slider = controlCell.querySelector(".param-slider");
     const readout = controlCell.querySelector(".param-val-readout");
@@ -257,7 +280,7 @@ function updateRowInPlace(entry, field) {
     }
   }
 
-  buildActCell(actCell, field);
+  buildActCell(entry, field);
 }
 
 function buildControlCell(entry, field) {
@@ -283,6 +306,18 @@ function buildControlCell(entry, field) {
       (field.deps?.length ? `\nDepends on: ${field.deps.join(", ")}` : "");
     badge.innerHTML = `<span>&#128279; bound</span><span class="bound-val"></span>`;
     badge.querySelector(".bound-val").textContent = formatParamValue(field);
+    controlCell.appendChild(badge);
+    return;
+  }
+
+  if (isConstantLocked(field)) {
+    entry.mode = "constant_locked";
+    const badge = document.createElement("span");
+    badge.className = "const-badge";
+    badge.title =
+      "Fixed hardware/PCB constant — click the lock button on the right to unlock if you need to correct a measurement";
+    badge.innerHTML = `<span>&#128274; const</span><span class="const-val"></span>`;
+    badge.querySelector(".const-val").textContent = formatParamValue(field);
     controlCell.appendChild(badge);
     return;
   }
@@ -330,7 +365,8 @@ function buildControlCell(entry, field) {
   controlCell.append(slider, readout);
 }
 
-function buildActCell(actCell, field) {
+function buildActCell(entry, field) {
+  const { actCell } = entry;
   actCell.innerHTML = "";
   if (field.key.startsWith("custom.")) {
     if (field.name !== "clearance") {
@@ -345,6 +381,26 @@ function buildActCell(actCell, field) {
       actCell.appendChild(delBtn);
     }
     return;
+  }
+
+  if (field.is_constant && !field.is_bound) {
+    const unlocked = unlockedConstants.has(field.key);
+    const lockBtn = document.createElement("button");
+    lockBtn.type = "button";
+    lockBtn.className = "lock-btn" + (unlocked ? " unlocked" : "");
+    lockBtn.title = unlocked
+      ? "Constant unlocked for editing — click to lock"
+      : "Hardware constant locked — click to unlock if measurement needs fixing";
+    lockBtn.innerHTML = unlocked ? "&#128275;" : "&#128274;";
+    lockBtn.addEventListener("click", () => {
+      if (unlockedConstants.has(field.key)) {
+        unlockedConstants.delete(field.key);
+      } else {
+        unlockedConstants.add(field.key);
+      }
+      updateRowInPlace(entry, field);
+    });
+    actCell.appendChild(lockBtn);
   }
 
   if (field.is_modified) {
@@ -568,6 +624,14 @@ export function initParamsPanel() {
   paramSyncPyBtn.addEventListener("click", () => {
     postParamPayload({ action: "sync_python" });
   });
+
+  if (toggleConstsBtn) {
+    toggleConstsBtn.addEventListener("click", () => {
+      showConstants = !showConstants;
+      toggleConstsBtn.classList.toggle("active", showConstants);
+      renderParamSheet(true);
+    });
+  }
 
   paramSearch.addEventListener("input", () => {
     paramFilterText = paramSearch.value;

@@ -8,7 +8,7 @@ MicroSpora encoder:
   the 3D-printed magnet holder on the 1.50 mm rear shaft stub and the table
   base extending toward +Y.
 
-The motor is a reference model (``motor_5010.py``), not a printed part.
+The motor is a reference model (``drone_motor_5010.py``), not a printed part.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from build123d import Box, Compound, Cylinder, Part, Pos, Rot
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from export import export  # noqa: E402
-from fixtures import motor_5010  # noqa: E402
+from fixtures import drone_motor_5010  # noqa: E402
 from params import ParamConfig  # noqa: E402
 from reference import microspora  # noqa: E402
 
@@ -33,8 +33,23 @@ class DroneStand(ParamConfig):
         "motor_bore": "= holder_d + 1.0",
         "magnet_d": "= magnet_actual_d + clearance",
         "magnet_t": "= magnet_actual_t + 0.1",
-        "shaft_d": "= motor_5010.shaft_d + 0.1",
+        "shaft_d": "= drone_motor_5010.shaft_d + 0.1",
     }
+    CONSTANTS = (
+        "motor_pitch_19",
+        "motor_pitch_16",
+        "microspora_w",
+        "microspora_h",
+        "microspora_pitch",
+        "microspora_hole_x",
+        "microspora_hole_z",
+        "microspora_hole_d",
+        "microspora_offset_x",
+        "microspora_offset_y",
+        "microspora_u8_h",
+        "magnet_actual_d",
+        "magnet_actual_t",
+    )
     PART_GROUPS = {
         "drone_stand": ["Base", "Motor plate", "Stator-side encoder"],
         "stand": ["Base", "Motor plate", "Stator-side encoder"],
@@ -60,7 +75,7 @@ class DroneStand(ParamConfig):
             "magnet_t",
             "microspora_gap",
         ],
-        "motor": ["motor_5010.*"],
+        "motor": ["drone_motor_5010.*"],
     }
     # Base: extends toward +Y behind the motor wall, with a front (-Y) lip
     # under the stator to spread the motor's weight and prevent forward tipping.
@@ -327,13 +342,17 @@ def magnet(cfg: DroneStand = DroneStand()) -> Part:
 
 def assembly_parts(
     cfg: DroneStand = DroneStand(),
-    motor_cfg: motor_5010.Motor5010 | None = None,
+    drone_motor_cfg: drone_motor_5010.DroneMotor5010 | None = None,
 ) -> list[tuple[str, Part, str]]:
     """L-stand, motor, magnet holder, magnet, and MicroSpora in working positions."""
     stand, holder = build(cfg)
     plate_z = cfg.base_t + cfg.motor_plate_h / 2
 
-    m_part = motor_5010.build(motor_cfg) if motor_cfg is not None else motor_5010.build()
+    m_part = (
+        drone_motor_5010.build(drone_motor_cfg)
+        if drone_motor_cfg is not None
+        else drone_motor_5010.build()
+    )
     motor = Pos(0, -cfg.motor_plate_t / 2, plate_z) * m_part
     board = microspora_board(cfg)
     bb = board.bounding_box()
@@ -353,10 +372,12 @@ def assembly_parts(
 
 def assemblies(
     cfg: DroneStand = DroneStand(),
-    motor_cfg: motor_5010.Motor5010 | None = None,
+    drone_motor_cfg: drone_motor_5010.DroneMotor5010 | None = None,
 ) -> dict[str, list[tuple[str, Part, str]]]:
     return {
-        "drone_stand_microspora": assembly_parts(cfg, motor_cfg=motor_cfg),
+        "drone_stand_microspora": assembly_parts(
+            cfg, drone_motor_cfg=drone_motor_cfg
+        ),
     }
 
 

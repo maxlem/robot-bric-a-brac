@@ -41,8 +41,9 @@ def param(
     group: str = "",
     doc: str = "",
     expr: str | None = None,
+    constant: bool = False,
 ) -> Any:
-    """Attach optional UI bounds, unit, comment, or default binding to a field."""
+    """Attach optional UI bounds, unit, comment, default binding, or constant flag."""
     meta = {
         "min": min,
         "max": max,
@@ -51,21 +52,35 @@ def param(
         "group": group,
         "doc": doc,
         "expr": expr,
+        "constant": constant,
     }
     return field(default=default, metadata=meta)
+
+
+def const(
+    default: Any,
+    *,
+    unit: str = "mm",
+    group: str = "",
+    doc: str = "",
+) -> Any:
+    """Declare a fixed physical/reference constant field (locked by default in UI)."""
+    return param(default, unit=unit, group=group, doc=doc, constant=True)
 
 
 @dataclass(frozen=True)
 class ParamConfig:
     """Base class for parametric CAD configuration dataclasses.
 
-    Subclasses can optionally define ``BINDINGS: ClassVar[dict[str, str]]``
-    mapping field names to default spreadsheet expressions (e.g.
-    ``{"motor_bore": "= holder_d + 1.0"}``), plus optional ``PART_GROUPS``
-    or ``PART_FIELDS`` to scope parameters per part/component in the viewer.
+    Subclasses can optionally define:
+    - ``BINDINGS``: field name -> default spreadsheet expression (e.g. ``"= holder_d + 1.0"``)
+    - ``CONSTANTS``: set/tuple of field names (or ``"*"``) that represent fixed
+      hardware/PCB measurements (locked by default in the UI without a slider)
+    - ``PART_GROUPS`` / ``PART_FIELDS``: per-part parameter scoping in the viewer.
     """
 
     BINDINGS: ClassVar[dict[str, str]] = {}
+    CONSTANTS: ClassVar[set[str] | tuple[str, ...]] = ()
     PART_GROUPS: ClassVar[dict[str, list[str]]] = {}
     PART_FIELDS: ClassVar[dict[str, list[str]]] = {}
 
@@ -128,7 +143,7 @@ def _parse_source_annotations(cls: type) -> dict[str, tuple[str, str]]:
         m = field_re.match(raw)
         if m:
             fname = m.group(1)
-            if fname in ("BINDINGS", "PART_GROUPS", "PART_FIELDS"):
+            if fname in ("BINDINGS", "CONSTANTS", "PART_GROUPS", "PART_FIELDS"):
                 continue
             rhs = m.group(2)
             inline_doc = ""
@@ -146,11 +161,18 @@ def extract_schema(cls: type) -> list[dict[str, Any]]:
 
     annotations = _parse_source_annotations(cls)
     bindings: dict[str, str] = getattr(cls, "BINDINGS", {}) or {}
+    constants_cfg = set(getattr(cls, "CONSTANTS", ()) or ())
+    all_constant = "*" in constants_cfg
     instance = cls()
     schema: list[dict[str, Any]] = []
 
     for f in fields(cls):
-        if f.name.startswith("_") or f.name == "BINDINGS":
+        if f.name.startswith("_") or f.name in (
+            "BINDINGS",
+            "CONSTANTS",
+            "PART_GROUPS",
+            "PART_FIELDS",
+        ):
             continue
         default_val = getattr(instance, f.name, f.default)
         if default_val is MISSING:
@@ -187,6 +209,10 @@ def extract_schema(cls: type) -> list[dict[str, Any]]:
         if default_expr is None:
             default_expr = str(default_val)
 
+        is_const = bool(
+            meta.get("constant") or all_constant or (f.name in constants_cfg)
+        )
+
         schema.append(
             {
                 "name": f.name,
@@ -199,6 +225,7 @@ def extract_schema(cls: type) -> list[dict[str, Any]]:
                 "unit": unit,
                 "group": meta.get("group") or group,
                 "doc": meta.get("doc") or inline_doc,
+                "constant": is_const,
             }
         )
 
@@ -798,6 +825,7 @@ class ParamMatrix:
                         "max": hi,
                         "step": cell["step"],
                         "is_bound": bound,
+                        "is_constant": bool(cell.get("constant", False)),
                         "is_modified": modified,
                         "deps": sorted(deps.get(key, set())),
                         "error": errors.get(key),

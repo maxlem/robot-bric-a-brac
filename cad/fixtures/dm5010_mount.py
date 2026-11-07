@@ -27,6 +27,12 @@ class DM5010Mount(ParamConfig):
         "board_pitch_x": "= board_w - 5.0",
         "board_pitch_y": "= board_h - 5.0",
     }
+    CONSTANTS = (
+        "motor_pitch",
+        "board_w",
+        "board_h",
+        "shaft_d",
+    )
     PART_GROUPS = {
         "dm5010_mount": [
             "Base",

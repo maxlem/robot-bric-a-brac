@@ -22,7 +22,7 @@ record where it came from, so a dimension can always be traced back.
 | Rotor holes | 4 × M3 on a Ø12 bolt circle |
 | Cable | 40 cm |
 
-The CAD model in `cad/fixtures/motor_5010.py` uses the 21.3 mm mounting face
+The CAD model in `cad/fixtures/drone_motor_5010.py` uses the 21.3 mm mounting face
 to rotor face, the Ø19/Ø16 stator cross, and the Ø12 rotor circle.
 
 ## SMC Powers Motor Inventory & Specifications
