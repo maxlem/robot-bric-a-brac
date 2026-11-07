@@ -116,12 +116,13 @@ class Builder:
             tail = ""
         return tail or "worker exited without output"
 
-    def build(self) -> dict:
+    def build(self, command: dict | None = None) -> dict:
+        cmd_obj = command or {"cmd": "build"}
         with self.lock:
             try:
                 if self._worker is None or self._worker.poll() is not None:
                     self._start_worker()
-                self._worker.stdin.write('{"cmd":"build"}\n')
+                self._worker.stdin.write(json.dumps(cmd_obj) + "\n")
                 self._worker.stdin.flush()
                 line = self._worker.stdout.readline()
                 if not line:
@@ -181,8 +182,22 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(404)
 
     def do_POST(self) -> None:
-        if self.path.split("?", 1)[0] == "/api/rebuild":
+        path = self.path.split("?", 1)[0]
+        if path == "/api/rebuild":
             threading.Thread(target=self.builder.build, daemon=True).start()
+            self._json({"ok": True})
+        elif path == "/api/params":
+            length = int(self.headers.get("Content-Length", "0") or "0")
+            raw = self.rfile.read(length) if length > 0 else b"{}"
+            try:
+                payload = json.loads(raw.decode("utf-8"))
+            except ValueError:
+                self.send_error(400)
+                return
+            cmd = {"cmd": "params", "payload": payload}
+            threading.Thread(
+                target=self.builder.build, args=(cmd,), daemon=True
+            ).start()
             self._json({"ok": True})
         else:
             self.send_error(404)

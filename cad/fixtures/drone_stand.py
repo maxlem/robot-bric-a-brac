@@ -8,11 +8,12 @@ MicroSpora encoder:
   the 3D-printed magnet holder on the 1.50 mm rear shaft stub and the table
   base extending toward +Y.
 
-The motor is a reference model (``motor_5010.py``), not a printed part.
+The motor is a reference model (``flycat_5010.py``), not a printed part.
 """
 
 from __future__ import annotations
 
+import functools
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,12 +22,61 @@ from build123d import Box, Compound, Cylinder, Part, Pos, Rot
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from export import export  # noqa: E402
-from fixtures import motor_5010  # noqa: E402
+from fixtures import flycat_5010  # noqa: E402
+from params import ParamConfig  # noqa: E402
 from reference import microspora  # noqa: E402
 
 
 @dataclass(frozen=True)
-class DroneStand:
+class DroneStand(ParamConfig):
+    BINDINGS = {
+        "motor_bore": "= holder_d + 1.0",
+        "magnet_d": "= magnet_actual_d + clearance",
+        "magnet_t": "= magnet_actual_t + 0.1",
+        "shaft_d": "= flycat_5010.shaft_d + 0.1",
+    }
+    CONSTANTS = (
+        "motor_pitch_19",
+        "motor_pitch_16",
+        "microspora_w",
+        "microspora_h",
+        "microspora_pitch",
+        "microspora_hole_x",
+        "microspora_hole_z",
+        "microspora_hole_d",
+        "microspora_offset_x",
+        "microspora_offset_y",
+        "microspora_u8_h",
+        "magnet_actual_d",
+        "magnet_actual_t",
+    )
+    PART_GROUPS = {
+        "drone_stand": ["Base", "Motor plate", "Stator-side encoder"],
+        "stand": ["Base", "Motor plate", "Stator-side encoder"],
+        "drone_magnet_holder": ["Stator-side magnet holder"],
+        "holder": ["Stator-side magnet holder"],
+        "drone_sensor_microspora": ["Stator-side encoder"],
+        "microspora": ["Stator-side encoder"],
+        "encoder": ["Stator-side encoder"],
+        "components": ["Stator-side encoder"],
+    }
+    PART_FIELDS = {
+        "drone_magnet": [
+            "magnet_actual_d",
+            "magnet_actual_t",
+            "magnet_d",
+            "magnet_t",
+            "microspora_gap",
+        ],
+        "magnet": [
+            "magnet_actual_d",
+            "magnet_actual_t",
+            "magnet_d",
+            "magnet_t",
+            "microspora_gap",
+        ],
+        "motor": ["flycat_5010.*"],
+    }
     # Base: extends toward +Y behind the motor wall, with a front (-Y) lip
     # under the stator to spread the motor's weight and prevent forward tipping.
     base_w: float = 100.0
@@ -77,6 +127,7 @@ class DroneStand:
     shaft_d: float = 4.1  # press fit: 4.0 mm shaft + 0.1 mm
 
 
+@functools.lru_cache(maxsize=8)
 def build(cfg: DroneStand = DroneStand()) -> tuple[Part, Part]:
     # Base: protrudes by base_lip in front (-Y) of the motor wall to spread the
     # overhanging motor weight, and extends toward +Y behind the wall.
@@ -178,6 +229,40 @@ def build(cfg: DroneStand = DroneStand()) -> tuple[Part, Part]:
     return stand, holder
 
 
+@functools.lru_cache(maxsize=16)
+def _placed_microspora_kind(
+    kind: str,
+    base_t: float,
+    motor_plate_h: float,
+    motor_plate_t: float,
+    microspora_recess_d: float,
+    microspora_offset_x: float,
+    microspora_offset_y: float,
+) -> Part:
+    pcb = microspora.board()
+    bb = pcb.bounding_box()
+    cx = (bb.min.X + bb.max.X) / 2
+    cy = (bb.min.Y + bb.max.Y) / 2
+    plate_z = base_t + motor_plate_h / 2
+    recess_bottom = motor_plate_t / 2 - microspora_recess_d
+
+    if kind == "board":
+        part = pcb
+    elif kind == "encoder":
+        part = microspora.encoder()
+    elif kind == "components":
+        part = microspora.components()
+    else:
+        part = Compound([pcb, microspora.encoder(), microspora.components()])
+
+    rotated = Rot(90, 0, 0) * Rot(0, 180, 0) * Rot(0, 0, 180) * part
+    return Pos(
+        -cx + microspora_offset_x,
+        recess_bottom,
+        plate_z + cy + microspora_offset_y,
+    ) * rotated
+
+
 def _place_microspora(part: Part, cfg: DroneStand = DroneStand()) -> Part:
     """Transform a STEP-frame MicroSpora mesh into the stand assembly frame."""
     pcb = microspora.board()
@@ -199,27 +284,57 @@ def _place_microspora(part: Part, cfg: DroneStand = DroneStand()) -> Part:
 
 def microspora_board(cfg: DroneStand = DroneStand()) -> Part:
     """Real MicroSpora PCB, component side facing +Y (visible from behind)."""
-    return _place_microspora(microspora.board(), cfg)
+    return _placed_microspora_kind(
+        "board",
+        cfg.base_t,
+        cfg.motor_plate_h,
+        cfg.motor_plate_t,
+        cfg.microspora_recess_d,
+        cfg.microspora_offset_x,
+        cfg.microspora_offset_y,
+    )
 
 
 def microspora_encoder(cfg: DroneStand = DroneStand()) -> Part:
     """The MT6701 (U8) on the board, for checking the magnet alignment."""
-    return _place_microspora(microspora.encoder(), cfg)
+    return _placed_microspora_kind(
+        "encoder",
+        cfg.base_t,
+        cfg.motor_plate_h,
+        cfg.motor_plate_t,
+        cfg.microspora_recess_d,
+        cfg.microspora_offset_x,
+        cfg.microspora_offset_y,
+    )
 
 
 def microspora_components(cfg: DroneStand = DroneStand()) -> Part:
     """All other named SMD components on the MicroSpora board."""
-    return _place_microspora(microspora.components(), cfg)
+    return _placed_microspora_kind(
+        "components",
+        cfg.base_t,
+        cfg.motor_plate_h,
+        cfg.motor_plate_t,
+        cfg.microspora_recess_d,
+        cfg.microspora_offset_x,
+        cfg.microspora_offset_y,
+    )
 
 
 def microspora_populated(cfg: DroneStand = DroneStand()) -> Part:
     """Populated MicroSpora board (PCB, U8 encoder, and all SMD components)."""
-    return _place_microspora(
-        Compound([microspora.board(), microspora.encoder(), microspora.components()]),
-        cfg,
+    return _placed_microspora_kind(
+        "populated",
+        cfg.base_t,
+        cfg.motor_plate_h,
+        cfg.motor_plate_t,
+        cfg.microspora_recess_d,
+        cfg.microspora_offset_x,
+        cfg.microspora_offset_y,
     )
 
 
+@functools.lru_cache(maxsize=8)
 def magnet(cfg: DroneStand = DroneStand()) -> Part:
     """Reference diametric magnet."""
     return Rot(90, 0, 0) * Cylinder(cfg.magnet_actual_d / 2, cfg.magnet_actual_t)
@@ -227,12 +342,18 @@ def magnet(cfg: DroneStand = DroneStand()) -> Part:
 
 def assembly_parts(
     cfg: DroneStand = DroneStand(),
+    flycat_cfg: flycat_5010.Flycat5010 | None = None,
 ) -> list[tuple[str, Part, str]]:
     """L-stand, motor, magnet holder, magnet, and MicroSpora in working positions."""
     stand, holder = build(cfg)
     plate_z = cfg.base_t + cfg.motor_plate_h / 2
 
-    motor = Pos(0, -cfg.motor_plate_t / 2, plate_z) * motor_5010.build()
+    m_part = (
+        flycat_5010.build(flycat_cfg)
+        if flycat_cfg is not None
+        else flycat_5010.build()
+    )
+    motor = Pos(0, -cfg.motor_plate_t / 2, plate_z) * m_part
     board = microspora_board(cfg)
     bb = board.bounding_box()
     sensor_face = bb.min.Y - cfg.microspora_u8_h
@@ -249,20 +370,25 @@ def assembly_parts(
     ]
 
 
-def assemblies() -> dict[str, list[tuple[str, Part, str]]]:
+def assemblies(
+    cfg: DroneStand = DroneStand(),
+    flycat_cfg: flycat_5010.Flycat5010 | None = None,
+) -> dict[str, list[tuple[str, Part, str]]]:
     return {
-        "drone_stand_microspora": assembly_parts(),
+        "drone_stand_microspora": assembly_parts(
+            cfg, flycat_cfg=flycat_cfg
+        ),
     }
 
 
-def parts() -> dict[str, Part]:
+def parts(cfg: DroneStand = DroneStand()) -> dict[str, Part]:
     """Named parts, for the viewer and the exporter."""
-    stand, holder = build()
+    stand, holder = build(cfg)
     return {
         "drone_stand": stand,
         "drone_magnet_holder": holder,
-        "drone_magnet": magnet(),
-        "drone_sensor_microspora": microspora_populated(),
+        "drone_magnet": magnet(cfg),
+        "drone_sensor_microspora": microspora_populated(cfg),
     }
 
 

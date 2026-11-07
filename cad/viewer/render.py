@@ -25,12 +25,13 @@ RENDERS = OUT / "renders"
 
 COLORS = {
     "drone_stand": "#8fa8c8",
-    "motor_5010": "#e0a060",
+    "flycat_5010": "#e0a060",
     "drone_magnet_carrier": "#7fc8a0",
     "drone_magnet_holder": "#7fc8a0",
     "drone_magnet": "#c080d0",
     "drone_sensor_as5048a": "#d07070",
     "drone_sensor_microspora": "#d07070",
+    "dm5010": "#e0a060",
     "dm5010_mount": "#8fa8c8",
     "dm5010_magnet_carrier": "#7fc8a0",
 }

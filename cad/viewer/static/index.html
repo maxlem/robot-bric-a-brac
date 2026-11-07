@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>CAD viewer</title>
-    <link rel="stylesheet" href="/static/style.css?v=2" />
+    <link rel="stylesheet" href="/static/style.css?v=10" />
     <script type="importmap">
       {
         "imports": {
@@ -50,13 +50,72 @@
       </aside>
       <main id="stage">
         <canvas id="view"></canvas>
+        <button id="param-open-btn" class="param-open-btn hidden" title="Open Parameters Spreadsheet">
+          fx Parameters
+        </button>
         <div id="hud"></div>
         <div id="error" class="error hidden">
           <button id="error-close" title="close">&times;</button>
           <pre id="error-text"></pre>
         </div>
       </main>
+      <aside id="param-panel" class="param-panel">
+        <header class="param-header">
+          <div class="param-title-group">
+            <span class="fx-badge">fx</span>
+            <h2>Parameters</h2>
+          </div>
+          <div class="param-actions">
+            <button type="button" id="param-add-var-btn" class="sm-btn" title="Add custom helper variable">+ Var</button>
+            <button type="button" id="param-save-preset-btn" class="sm-btn" title="Save current parameter matrix as a named preset">Save Preset</button>
+            <button type="button" id="param-sync-py-btn" class="sm-btn primary" title="Write modified parameter values back into the Python dataclass files">Sync to Python</button>
+            <button type="button" id="param-reset-all-btn" class="sm-btn" title="Reset all parameters to defaults">Reset</button>
+            <button type="button" id="param-collapse-btn" class="sm-btn" title="Collapse panel">&raquo;</button>
+          </div>
+        </header>
+        <div class="param-toolbar">
+          <div class="param-top-bar">
+            <div id="param-tabs" class="param-tabs" role="tablist"></div>
+            <div class="preset-bar">
+              <button type="button" id="toggle-consts-btn" class="sm-btn active" title="Show or hide physical hardware constants">&#128274; Consts</button>
+              <select id="preset-select" class="preset-select" title="Load a saved parameter preset">
+                <option value="">Presets…</option>
+              </select>
+            </div>
+          </div>
+          <div class="param-filter-row">
+            <input
+              type="search"
+              id="param-search"
+              class="param-search"
+              placeholder="Filter parameters or comments, or type =formula in a cell…"
+            />
+          </div>
+        </div>
+        <form id="param-preset-form" class="param-preset-form hidden">
+          <input type="text" id="preset-name-input" placeholder="Preset name (e.g. tight_gap)" required />
+          <button type="submit" class="sm-btn primary">Save</button>
+          <button type="button" id="preset-cancel-btn" class="sm-btn">&times;</button>
+        </form>
+        <form id="param-new-var-form" class="param-new-var hidden">
+          <input type="text" id="new-var-name" placeholder="name (e.g. gap)" required />
+          <input type="text" id="new-var-expr" placeholder="expr (e.g. 0.25)" value="0.25" required />
+          <input type="text" id="new-var-doc" placeholder="description" />
+          <button type="submit" class="sm-btn primary">Add</button>
+          <button type="button" id="new-var-cancel" class="sm-btn">&times;</button>
+        </form>
+        <div class="param-table-head">
+          <span>Parameter</span>
+          <span>Expression / Binding</span>
+          <span>Slider / Value</span>
+          <span></span>
+        </div>
+        <div id="param-sheet" class="param-sheet"></div>
+        <footer class="param-footer">
+          <span id="param-hint">Tip: start an expression with <code>=</code> (e.g. <code>= holder_d + 1.0</code> or <code>= flycat_5010.shaft_d + 0.1</code>). Click any parameter name while editing a formula to insert it.</span>
+        </footer>
+      </aside>
     </div>
-    <script type="module" src="/static/app.js?v=2"></script>
+    <script type="module" src="/static/app.js?v=10"></script>
   </body>
 </html>

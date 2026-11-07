@@ -5,9 +5,9 @@ record where it came from, so a dimension can always be traced back.
 
 | File | Part | Source |
 |---|---|---|
-| `5010-360kv-brushless-motor.pdf` | 5010 360KV outrunner | <https://robu-prod-media.s3.ap-south-1.amazonaws.com/uploads/2017/10/5010-360KV-High-Torque-Brushless-Motor-for-Drone.pdf> |
+| `5010-360kv-brushless-motor.pdf` | Flycat 5010 360KV outrunner | <https://robu-prod-media.s3.ap-south-1.amazonaws.com/uploads/2017/10/5010-360KV-High-Torque-Brushless-Motor-for-Drone.pdf> / <https://www.flyrobo.in/5010-360kv-high-torque-brushless-motor> |
 
-## 5010 360KV
+## Flycat 5010 360KV
 
 | Spec | Value |
 |---|---|
@@ -22,8 +22,25 @@ record where it came from, so a dimension can always be traced back.
 | Rotor holes | 4 × M3 on a Ø12 bolt circle |
 | Cable | 40 cm |
 
-The CAD model in `cad/fixtures/motor_5010.py` uses the 21.3 mm mounting face
+The CAD model in `cad/fixtures/flycat_5010.py` uses the 21.3 mm mounting face
 to rotor face, the Ø19/Ø16 stator cross, and the Ø12 rotor circle.
+
+## DM5010 + BGC-CAN-DRV (`25150101`)
+
+| Spec | Value |
+|---|---|
+| Product page | <http://shop.smc-powers.com/DM5010-BGC-DRV.html> |
+| Drawing | <http://shop.smc-powers.com/image/data/SMC/DM5010D-12.jpg> |
+| Configuration | 24N28P (14 pole pairs) |
+| Outer envelope | **Ø49.0 × 28.90 mm** |
+| Hollow slip-ring bore | **Ø12.7 mm** through-hole |
+| Stator / rear cover holes | 4 × M2.5 on a **20.0 × 20.0 mm** square |
+| Rotor / front face holes | 4 × M3 on a **Ø25.0 mm** bolt circle |
+| Weight | 131–135 g |
+
+The CAD model in `cad/fixtures/dm5010.py` (`DM5010`) models the Ø49.0 × 28.90 mm
+housing, the Ø12.7 mm slip-ring through-bore, the 20 × 20 mm M2.5 stator pattern,
+the Ø25 mm M3 rotor bolt circle, and the side BGC-CAN-DRV connector pocket.
 
 ## SMC Powers Motor Inventory & Specifications
 
@@ -34,7 +51,7 @@ Ordered / owned motors from [SMC Powers](http://shop.smc-powers.com/) for the bi
 | **PM5225 + AS5048A** | `2552252` | 4 | Housed outrunner | Built-in AS5048A (PWM / SPI) | $47.41 | $189.64 | <http://shop.smc-powers.com/PM5225.html> |
 | **FL-OR5225** | `20052250` | 2 | Frameless outrunner | External (MT6701 / AS5048A) | $21.80 | $43.60 | <http://shop.smc-powers.com/Frameless-OR5225.html> |
 | **DM5015** | `25150151` | 2 | Housed gimbal (Ø12.7 mm bore) | External (MT6701 / AS5048A) | $36.00 | $72.00 | <http://shop.smc-powers.com/Motor/For-Gimbal-Motor> |
-| **DM5010** | `25150101` | 2 *(1 owned + 1 ordered)* | Housed gimbal (Ø12.7 mm bore) | External (MT6701 / AS5048A) | $31.50 | $63.00 | <http://shop.smc-powers.com/Motor/For-Gimbal-Motor> |
+| **DM5010** | `25150101` | 2 *(1 owned + 1 ordered)* | Housed gimbal (Ø12.7 mm bore) | External (MT6701 / AS5048A) | $31.50 | $63.00 | <http://shop.smc-powers.com/DM5010-BGC-DRV.html> |
 
 ### Electrical & Mechanical Specifications
 

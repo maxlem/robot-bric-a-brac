@@ -12,6 +12,7 @@ outline, holes, and slots are kept.
 
 from __future__ import annotations
 
+import functools
 import subprocess
 import sys
 from pathlib import Path
@@ -80,17 +81,20 @@ def ensure() -> Path:
     return PCB_STL
 
 
+@functools.lru_cache(maxsize=None)
 def board():
     """The PCB as a mesh, in the STEP frame (x width, y height, z thickness)."""
     return import_stl(str(ensure()))
 
 
+@functools.lru_cache(maxsize=None)
 def encoder():
     """The MT6701 (U8) as a mesh, in the STEP frame."""
     ensure()
     return import_stl(str(ENC_STL))
 
 
+@functools.lru_cache(maxsize=None)
 def components():
     """All other named SMD components as a mesh, in the STEP frame."""
     ensure()
