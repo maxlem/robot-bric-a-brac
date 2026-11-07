@@ -5,9 +5,9 @@ record where it came from, so a dimension can always be traced back.
 
 | File | Part | Source |
 |---|---|---|
-| `5010-360kv-brushless-motor.pdf` | 5010 360KV outrunner | <https://robu-prod-media.s3.ap-south-1.amazonaws.com/uploads/2017/10/5010-360KV-High-Torque-Brushless-Motor-for-Drone.pdf> |
+| `5010-360kv-brushless-motor.pdf` | Flycat 5010 360KV outrunner | <https://robu-prod-media.s3.ap-south-1.amazonaws.com/uploads/2017/10/5010-360KV-High-Torque-Brushless-Motor-for-Drone.pdf> / <https://www.flyrobo.in/5010-360kv-high-torque-brushless-motor> |
 
-## 5010 360KV
+## Flycat 5010 360KV
 
 | Spec | Value |
 |---|---|

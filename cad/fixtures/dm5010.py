@@ -41,26 +41,42 @@ class DM5010(ParamConfig):
     gap_l: float = 0.5  # axial seam between driver cap and rotor bell (mm)
     seam_d: float = 47.5  # diameter at rotor/stator seam groove (mm)
 
-    # Hollow slip-ring bore and front rotor hub recess.
+    # Hollow slip-ring bore.
     bore_d: float = 12.7  # hollow slip-ring through-bore diameter (mm)
     shaft_boss_d: float = 15.0  # inner hollow shaft collar OD on rotor face (mm)
     hub_recess_d: float = 19.0  # annular recess OD around shaft collar (mm)
     hub_recess_depth: float = 2.0  # annular recess depth on rotor face (mm)
 
-    # Stator / rear driver cover mounting pattern (20 x 20 mm square).
+    # Stator mounting pattern.
     stator_pitch: float = 20.0  # 4 x M2.5 square spacing (mm)
     stator_hole_d: float = 2.5  # M2.5 tap diameter (mm)
     stator_hole_depth: float = 5.0
 
-    # Rotor / front mounting pattern (Ø25 mm bolt circle).
+    # Rotor mounting pattern.
     rotor_pitch: float = 25.0  # 4 x M3 bolt circle diameter (mm)
     rotor_hole_d: float = 3.0  # M3 tap diameter (mm)
     rotor_hole_depth: float = 5.0
 
-    # Side connector pocket and rear cap details.
+    # Side connector pocket.
     connector_w: float = 14.0  # side connector cutout height along Z (mm)
     connector_l: float = 5.5  # side connector cutout axial width along Y (mm)
     connector_depth: float = 4.5  # radial depth into -X side of driver housing (mm)
+
+    # Electrical specifications.
+    pole_pairs: int = 14  # 24N28P configuration (14 pole pairs)
+    nominal_voltage_v: float = 16.0  # rated voltage (16-24 V bus)
+    nominal_current_a: float = 0.79  # rated continuous current (A)
+    stall_current_a: float = 1.20  # peak / stall current (A)
+    resistance_ohm: float = 10.8  # line-to-line phase resistance (ohm, 10.3 meas.)
+    inductance_mh: float = 4.74  # line-to-line phase inductance (mH)
+    kv_rpm_per_v: float = 33.0  # speed constant Kv (rpm/V)
+    kt_nm_per_a: float = 0.27  # torque constant Kt (Nm/A)
+    nominal_torque_nm: float = 0.25  # continuous rated torque (Nm)
+    stall_torque_nm: float = 0.32  # peak / stall torque (Nm)
+    nominal_speed_rpm: float = 150.0  # rated speed (rpm)
+    max_speed_rpm: float = 505.0  # no-load max speed (rpm)
+    rotor_inertia_gcm2: float = 202.0  # rotor inertia (g*cm^2)
+    mass_g: float = 135.0  # motor mass (g)
 
 
 @functools.lru_cache(maxsize=8)
