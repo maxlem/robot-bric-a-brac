@@ -21,6 +21,7 @@ export function renderSidebar() {
 
   const addSection = (title, items, type) => {
     if (!items.length) return;
+    const aliases = (state.params && state.params.aliases) || {};
     const header = document.createElement("li");
     header.className = "section";
     header.textContent = title;
@@ -39,11 +40,18 @@ export function renderSidebar() {
             : `${item.volume_mm3.toLocaleString()} mm³ · ${item.duration_ms.toFixed(0)} ms`
           : "build failed";
 
+      const modShort = item.module ? item.module.split(".").pop() : item.name;
+      const aliasName = aliases[item.name] || aliases[modShort];
+      const displayTitle =
+        aliasName && aliasName !== item.name
+          ? `${aliasName} (${item.name})`
+          : item.name;
+
       li.innerHTML = `
         <span class="dot"></span>
         <span class="name"></span>
         <span class="meta"></span>`;
-      li.querySelector(".name").textContent = item.name;
+      li.querySelector(".name").textContent = displayTitle;
       li.querySelector(".meta").textContent = meta;
 
       li.addEventListener("click", () => {
@@ -91,7 +99,11 @@ export function renderSidebar() {
 
           const cname = document.createElement("span");
           cname.className = "comp-name";
-          cname.textContent = comp.name;
+          const compAlias = aliases[comp.name];
+          cname.textContent =
+            compAlias && compAlias !== comp.name
+              ? `${compAlias} (${comp.name})`
+              : comp.name;
 
           const ghostBtn = document.createElement("button");
           ghostBtn.type = "button";

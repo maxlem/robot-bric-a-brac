@@ -10,6 +10,8 @@ const paramPanel = document.getElementById("param-panel");
 const paramOpenBtn = document.getElementById("param-open-btn");
 const paramCollapseBtn = document.getElementById("param-collapse-btn");
 const paramAddVarBtn = document.getElementById("param-add-var-btn");
+const paramAddInstBtn = document.getElementById("param-add-inst-btn");
+const paramRenameInstBtn = document.getElementById("param-rename-inst-btn");
 const paramSavePresetBtn = document.getElementById("param-save-preset-btn");
 const paramSyncPyBtn = document.getElementById("param-sync-py-btn");
 const paramResetAllBtn = document.getElementById("param-reset-all-btn");
@@ -19,6 +21,13 @@ const presetSelect = document.getElementById("preset-select");
 const paramPresetForm = document.getElementById("param-preset-form");
 const presetNameInput = document.getElementById("preset-name-input");
 const presetCancelBtn = document.getElementById("preset-cancel-btn");
+const paramInstForm = document.getElementById("param-inst-form");
+const instNameInput = document.getElementById("inst-name-input");
+const instTypeSelect = document.getElementById("inst-type-select");
+const instCancelBtn = document.getElementById("inst-cancel-btn");
+const paramRenameForm = document.getElementById("param-rename-form");
+const renameInstInput = document.getElementById("rename-inst-input");
+const renameCancelBtn = document.getElementById("rename-cancel-btn");
 const paramSearch = document.getElementById("param-search");
 const paramNewVarForm = document.getElementById("param-new-var-form");
 const newVarName = document.getElementById("new-var-name");
@@ -72,29 +81,78 @@ function formatParamValue(field) {
   return `${field.value}`;
 }
 
+export function currentRenameTarget() {
+  const pstate = store.state.params || { modules: {} };
+  const modules = pstate.modules || {};
+  if (store.paramTab !== "active" && store.paramTab !== "all" && modules[store.paramTab]) {
+    return store.paramTab;
+  }
+  if (store.activeSubComp === "motor") return "flycat_5010";
+  if (store.activeSubComp) return store.activeSubComp;
+  const curMod = activeModuleShort();
+  return curMod || Object.keys(modules)[0] || "";
+}
+
 export function renderParamTabs() {
   const pstate = store.state.params || { modules: {}, custom: [] };
-  const modShorts = Object.keys(pstate.modules || {});
+  const modules = pstate.modules || {};
+  const aliases = pstate.aliases || {};
+  const modShorts = Object.keys(modules);
   const scopeLabel = activeScopeLabel();
+  const scopeDisplay = scopeLabel ? aliases[scopeLabel] || scopeLabel : "";
 
   paramTabs.innerHTML = "";
   const tabs = [
-    { id: "active", label: scopeLabel ? `Active (${scopeLabel})` : "Active" },
-    ...modShorts.map((m) => ({ id: m, label: m })),
-    { id: "all", label: "All" },
+    {
+      id: "active",
+      name: scopeDisplay ? `Active (${scopeDisplay})` : "Active",
+      typeName: "",
+    },
+    ...modShorts.map((m) => {
+      const minfo = modules[m];
+      return {
+        id: m,
+        name: minfo.alias || m,
+        typeName: minfo.class_name || "",
+      };
+    }),
+    { id: "all", name: "All", typeName: "" },
   ];
 
   for (const t of tabs) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "param-tab" + (store.paramTab === t.id ? " active" : "");
-    btn.textContent = t.label;
+    const labelSpan = document.createElement("span");
+    labelSpan.textContent = t.name;
+    btn.appendChild(labelSpan);
+    if (t.typeName) {
+      const typeSpan = document.createElement("span");
+      typeSpan.className = "tab-type";
+      typeSpan.textContent = `: ${t.typeName}`;
+      btn.appendChild(typeSpan);
+    }
     btn.addEventListener("click", () => {
       store.paramTab = t.id;
       renderParamTabs();
       renderParamSheet(true);
     });
     paramTabs.appendChild(btn);
+  }
+
+  // Populate instance creation type selector with base module classes
+  if (instTypeSelect) {
+    const prevVal = instTypeSelect.value;
+    instTypeSelect.innerHTML = "";
+    for (const m of modShorts) {
+      const minfo = modules[m];
+      if (minfo.is_instance) continue;
+      const opt = document.createElement("option");
+      opt.value = m;
+      opt.textContent = `${minfo.class_name} (${m})`;
+      if (m === prevVal) opt.selected = true;
+      instTypeSelect.appendChild(opt);
+    }
   }
 
   const presets = pstate.presets || [];
@@ -188,11 +246,19 @@ function getVisibleSections() {
           (f.expr && f.expr.toLowerCase().includes(filter));
         if (!match) continue;
       }
-      const gname = multiModule ? `${short} · ${f.group}` : f.group;
+      const instLabel = modInfo.alias || short;
+      const typeLabel = modInfo.class_name || short;
+      const gname = `${instLabel} : ${typeLabel} · ${f.group}`;
       if (!byGroup.has(gname)) byGroup.set(gname, []);
       byGroup
         .get(gname)
-        .push({ ...f, moduleShort: short, showModuleTag: multiModule });
+        .push({
+          ...f,
+          moduleShort: short,
+          moduleAlias: instLabel,
+          className: typeLabel,
+          showModuleTag: multiModule,
+        });
     }
     for (const [gtitle, fields] of byGroup.entries()) {
       sections.push({
@@ -438,7 +504,7 @@ function createParamRow(field) {
   if (field.showModuleTag) {
     const modTag = document.createElement("span");
     modTag.className = "param-mod-tag";
-    modTag.textContent = field.moduleShort;
+    modTag.textContent = `${field.moduleAlias || field.moduleShort}:${field.className || ""}`;
     nameBtn.appendChild(modTag);
   }
 
@@ -459,10 +525,11 @@ function createParamRow(field) {
     ) {
       const targetMod = lastFocusedExprInput.dataset.module;
       const sourceMod = field.key.split(".")[0];
+      const prefixAlias = field.moduleAlias || sourceMod;
       const refToken =
         sourceMod === "custom" || sourceMod === targetMod
           ? field.name
-          : field.key;
+          : `${prefixAlias}.${field.name}`;
 
       let curVal = lastFocusedExprInput.value.trim();
       if (!curVal.startsWith("=")) {
@@ -624,6 +691,67 @@ export function initParamsPanel() {
   paramSyncPyBtn.addEventListener("click", () => {
     postParamPayload({ action: "sync_python" });
   });
+
+  if (paramAddInstBtn) {
+    paramAddInstBtn.addEventListener("click", () => {
+      paramInstForm.classList.toggle("hidden");
+      paramRenameForm.classList.add("hidden");
+      if (!paramInstForm.classList.contains("hidden")) {
+        instNameInput.focus();
+      }
+    });
+  }
+
+  if (instCancelBtn) {
+    instCancelBtn.addEventListener("click", () => {
+      paramInstForm.classList.add("hidden");
+    });
+  }
+
+  if (paramInstForm) {
+    paramInstForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const name = instNameInput.value.trim();
+      const base_type = instTypeSelect.value;
+      if (!name || !base_type) return;
+      postParamPayload({ action: "add_instance", name, base_type });
+      store.paramTab = name.replace(/[^a-zA-Z0-9_]/g, "_");
+      instNameInput.value = "";
+      paramInstForm.classList.add("hidden");
+    });
+  }
+
+  if (paramRenameInstBtn) {
+    paramRenameInstBtn.addEventListener("click", () => {
+      paramRenameForm.classList.toggle("hidden");
+      paramInstForm.classList.add("hidden");
+      if (!paramRenameForm.classList.contains("hidden")) {
+        const target = currentRenameTarget();
+        const pstate = store.state.params || {};
+        const curAlias = (pstate.aliases && pstate.aliases[target]) || target;
+        renameInstInput.value = curAlias;
+        renameInstInput.focus();
+        renameInstInput.select();
+      }
+    });
+  }
+
+  if (renameCancelBtn) {
+    renameCancelBtn.addEventListener("click", () => {
+      paramRenameForm.classList.add("hidden");
+    });
+  }
+
+  if (paramRenameForm) {
+    paramRenameForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const target = currentRenameTarget();
+      const new_name = renameInstInput.value.trim();
+      if (!target || !new_name) return;
+      postParamPayload({ action: "rename_instance", target, new_name });
+      paramRenameForm.classList.add("hidden");
+    });
+  }
 
   if (toggleConstsBtn) {
     toggleConstsBtn.addEventListener("click", () => {

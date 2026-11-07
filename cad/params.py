@@ -478,6 +478,10 @@ class ParamMatrix:
         }
         self.presets: dict[str, dict[str, Any]] = {}
         self.active_preset: str = ""
+        # instance_name -> base_module_short (e.g. {"knee_motor": "flycat_5010"})
+        self.instances: dict[str, str] = {}
+        # target_id -> custom display/formula alias (e.g. {"motor": "knee_motor"})
+        self.aliases: dict[str, str] = {}
         self.last_message: str = ""
         self._load_disk_state()
 
@@ -496,6 +500,14 @@ class ParamMatrix:
                 self.presets = data["presets"]
             if isinstance(data.get("active_preset"), str):
                 self.active_preset = data["active_preset"]
+            if isinstance(data.get("instances"), dict):
+                self.instances = {
+                    str(k): str(v) for k, v in data["instances"].items()
+                }
+            if isinstance(data.get("aliases"), dict):
+                self.aliases = {
+                    str(k): str(v) for k, v in data["aliases"].items()
+                }
         except (OSError, ValueError):
             pass
 
@@ -508,6 +520,8 @@ class ParamMatrix:
                 "custom_vars": self.custom_vars,
                 "presets": self.presets,
                 "active_preset": self.active_preset,
+                "instances": self.instances,
+                "aliases": self.aliases,
             }
             tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
             tmp.replace(PARAMS_STATE_FILE)
@@ -563,6 +577,58 @@ class ParamMatrix:
             name = str(payload.get("name", "")).strip()
             self.custom_vars.pop(name, None)
             self.overrides.pop(f"custom.{name}", None)
+            self._save_disk_state()
+            return
+
+        if action == "add_instance":
+            raw_name = str(payload.get("name", "")).strip()
+            name = re.sub(r"[^a-zA-Z0-9_]", "_", raw_name)
+            base_type = str(payload.get("base_type", "")).strip()
+            if not name or name[0].isdigit() or not base_type:
+                return
+            self.instances[name] = base_type
+            self.last_message = f"Added instance '{name}' ({base_type})"
+            self._save_disk_state()
+            return
+
+        if action == "delete_instance":
+            name = str(payload.get("name", "")).strip()
+            self.instances.pop(name, None)
+            self.aliases.pop(name, None)
+            prefix = f"{name}."
+            for k in [k for k in self.overrides if k.startswith(prefix)]:
+                del self.overrides[k]
+            self.last_message = f"Deleted instance '{name}'"
+            self._save_disk_state()
+            return
+
+        if action == "rename_instance":
+            target = str(payload.get("target", "")).strip()
+            raw_new = str(payload.get("new_name", "")).strip()
+            new_name = re.sub(r"[^a-zA-Z0-9_]", "_", raw_new)
+            if not target or not new_name or new_name[0].isdigit():
+                return
+            old_alias = self.aliases.get(target, target)
+            if target in self.instances and target != new_name:
+                base_type = self.instances.pop(target)
+                self.instances[new_name] = base_type
+                old_prefix = f"{target}."
+                for k in list(self.overrides.keys()):
+                    if k.startswith(old_prefix):
+                        field_part = k[len(old_prefix) :]
+                        self.overrides[f"{new_name}.{field_part}"] = (
+                            self.overrides.pop(k)
+                        )
+            else:
+                self.aliases[target] = new_name
+
+            # Cascade rename across all formula bindings in overrides
+            for old_tok in {target, old_alias}:
+                pat = re.compile(rf"\b{re.escape(old_tok)}\.")
+                for k, v in list(self.overrides.items()):
+                    self.overrides[k] = pat.sub(f"{new_name}.", v)
+
+            self.last_message = f"Renamed '{old_alias}' → '{new_name}' (bindings updated)"
             self._save_disk_state()
             return
 
@@ -651,6 +717,19 @@ class ParamMatrix:
             class_to_short[cls.__name__] = short
             schemas_by_short[short] = extract_schema(cls)
 
+        # Register named instances (e.g. knee_motor -> flycat_5010)
+        for inst_name, base_short in list(self.instances.items()):
+            if base_short in classes_by_short and inst_name not in schemas_by_short:
+                cls = classes_by_short[base_short]
+                short_to_full[inst_name] = f"instance.{inst_name}"
+                classes_by_short[inst_name] = cls
+                schemas_by_short[inst_name] = extract_schema(cls)
+
+        # Register user aliases so formulas can reference renamed instances/modules
+        for target_id, alias_name in self.aliases.items():
+            if target_id in schemas_by_short and alias_name not in schemas_by_short:
+                class_to_short[alias_name] = target_id
+
         cells: dict[str, dict[str, Any]] = {}
 
         for cname, cinfo in self.custom_vars.items():
@@ -675,12 +754,29 @@ class ParamMatrix:
         for short, field_list in schemas_by_short.items():
             for fdesc in field_list:
                 key = f"{short}.{fdesc['name']}"
-                default_expr = fdesc["default_expr"]
+                default_expr = str(fdesc["default_expr"])
+                # Apply active instance aliases to default binding expressions so
+                # default formulas also follow renamed instances automatically.
+                for orig_mod, alias_mod in self.aliases.items():
+                    if orig_mod != alias_mod and f"{orig_mod}." in default_expr:
+                        default_expr = re.sub(
+                            rf"\b{re.escape(orig_mod)}\.",
+                            f"{alias_mod}.",
+                            default_expr,
+                        )
                 expr = self.overrides.get(key, default_expr)
+                for orig_mod, alias_mod in self.aliases.items():
+                    if orig_mod != alias_mod and f"{orig_mod}." in expr:
+                        expr = re.sub(
+                            rf"\b{re.escape(orig_mod)}\.",
+                            f"{alias_mod}.",
+                            expr,
+                        )
                 if key in self.overrides and expr == default_expr:
                     del self.overrides[key]
                 cells[key] = {
                     **fdesc,
+                    "default_expr": default_expr,
                     "key": key,
                     "module": short,
                     "expr": expr,
@@ -779,6 +875,8 @@ class ParamMatrix:
                 short_mod, attr = key.split(".", 1)
                 if short_mod in classes_by_short:
                     env[f"{classes_by_short[short_mod].__name__}.{attr}"] = val
+                if short_mod in self.aliases:
+                    env[f"{self.aliases[short_mod]}.{attr}"] = val
             return val
 
         for key in cells:
@@ -833,10 +931,15 @@ class ParamMatrix:
                 )
 
             configs[full_name] = cls(**kwargs)
+            is_inst = short in self.instances
+            base_short = self.instances.get(short, short)
             serialized_modules[short] = {
                 "module": full_name,
                 "short": short,
+                "alias": self.aliases.get(short, short),
                 "class_name": cls.__name__,
+                "is_instance": is_inst,
+                "base_type": base_short,
                 "fields": out_fields,
             }
 
@@ -926,6 +1029,8 @@ class ParamMatrix:
             "modules": serialized_modules,
             "custom": custom_out,
             "part_scopes": part_scopes,
+            "instances": self.instances,
+            "aliases": self.aliases,
             "presets": sorted(self.presets.keys()),
             "active_preset": self.active_preset,
             "message": self.last_message,
