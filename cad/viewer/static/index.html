@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>CAD viewer</title>
-    <link rel="stylesheet" href="/static/style.css?v=8" />
+    <link rel="stylesheet" href="/static/style.css?v=9" />
     <script type="importmap">
       {
         "imports": {
@@ -67,8 +67,7 @@
           </div>
           <div class="param-actions">
             <button type="button" id="param-add-var-btn" class="sm-btn" title="Add custom helper variable">+ Var</button>
-            <button type="button" id="param-add-inst-btn" class="sm-btn" title="Create a named component instance (e.g. knee_motor)">+ Instance</button>
-            <button type="button" id="param-rename-inst-btn" class="sm-btn" title="Rename the active component/instance">&#9998; Rename</button>
+            <button type="button" id="param-add-inst-btn" class="sm-btn" title="Create a named component instance (e.g. moteur_genou)">+ Instance</button>
             <button type="button" id="param-save-preset-btn" class="sm-btn" title="Save current parameter matrix as a named preset">Save Preset</button>
             <button type="button" id="param-sync-py-btn" class="sm-btn primary" title="Write modified parameter values back into the Python dataclass files">Sync to Python</button>
             <button type="button" id="param-reset-all-btn" class="sm-btn" title="Reset all parameters to defaults">Reset</button>
@@ -105,11 +104,6 @@
           <button type="submit" class="sm-btn primary">Create</button>
           <button type="button" id="inst-cancel-btn" class="sm-btn">&times;</button>
         </form>
-        <form id="param-rename-form" class="param-preset-form hidden">
-          <input type="text" id="rename-inst-input" placeholder="New instance name (e.g. moteur_genou)" required />
-          <button type="submit" class="sm-btn primary">Rename</button>
-          <button type="button" id="rename-cancel-btn" class="sm-btn">&times;</button>
-        </form>
         <form id="param-new-var-form" class="param-new-var hidden">
           <input type="text" id="new-var-name" placeholder="name (e.g. gap)" required />
           <input type="text" id="new-var-expr" placeholder="expr (e.g. 0.25)" value="0.25" required />
@@ -129,6 +123,6 @@
         </footer>
       </aside>
     </div>
-    <script type="module" src="/static/app.js?v=8"></script>
+    <script type="module" src="/static/app.js?v=9"></script>
   </body>
 </html>

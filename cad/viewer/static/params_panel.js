@@ -11,7 +11,6 @@ const paramOpenBtn = document.getElementById("param-open-btn");
 const paramCollapseBtn = document.getElementById("param-collapse-btn");
 const paramAddVarBtn = document.getElementById("param-add-var-btn");
 const paramAddInstBtn = document.getElementById("param-add-inst-btn");
-const paramRenameInstBtn = document.getElementById("param-rename-inst-btn");
 const paramSavePresetBtn = document.getElementById("param-save-preset-btn");
 const paramSyncPyBtn = document.getElementById("param-sync-py-btn");
 const paramResetAllBtn = document.getElementById("param-reset-all-btn");
@@ -25,9 +24,6 @@ const paramInstForm = document.getElementById("param-inst-form");
 const instNameInput = document.getElementById("inst-name-input");
 const instTypeSelect = document.getElementById("inst-type-select");
 const instCancelBtn = document.getElementById("inst-cancel-btn");
-const paramRenameForm = document.getElementById("param-rename-form");
-const renameInstInput = document.getElementById("rename-inst-input");
-const renameCancelBtn = document.getElementById("rename-cancel-btn");
 const paramSearch = document.getElementById("param-search");
 const paramNewVarForm = document.getElementById("param-new-var-form");
 const newVarName = document.getElementById("new-var-name");
@@ -231,6 +227,40 @@ function getVisibleSections() {
     const modInfo = modules[short];
     if (!modInfo) continue;
     const byGroup = new Map();
+    const instLabel = modInfo.alias || short;
+    const typeLabel = modInfo.class_name || short;
+
+    // Include editable "name" parameter row at the top of each component/instance
+    const hasVisibleFields = modInfo.fields.some(
+      (f) => !scopedKeyList || scopedKeyList.has(f.key),
+    );
+    if (hasVisibleFields && (!filter || "name".includes(filter) || instLabel.toLowerCase().includes(filter) || typeLabel.toLowerCase().includes(filter))) {
+      const idGroup = `${instLabel} : ${typeLabel} · Instance`;
+      byGroup.set(idGroup, [
+        {
+          key: `${short}.__name__`,
+          targetShort: short,
+          name: "name",
+          type: "instance_name",
+          group: "Instance",
+          doc: "Instance identifier (editing updates all bindings)",
+          unit: "",
+          default: short,
+          default_expr: short,
+          expr: instLabel,
+          value: instLabel,
+          className: typeLabel,
+          is_instance: !!modInfo.is_instance,
+          is_bound: false,
+          is_constant: false,
+          is_modified: instLabel !== short,
+          moduleShort: short,
+          moduleAlias: instLabel,
+          showModuleTag: multiModule,
+        },
+      ]);
+    }
+
     for (const f of modInfo.fields) {
       if (!showConstants && f.is_constant && !f.is_modified) {
         continue;
@@ -246,8 +276,6 @@ function getVisibleSections() {
           (f.expr && f.expr.toLowerCase().includes(filter));
         if (!match) continue;
       }
-      const instLabel = modInfo.alias || short;
-      const typeLabel = modInfo.class_name || short;
       const gname = `${instLabel} : ${typeLabel} · ${f.group}`;
       if (!byGroup.has(gname)) byGroup.set(gname, []);
       byGroup
@@ -363,6 +391,17 @@ function buildControlCell(entry, field) {
     return;
   }
 
+  if (field.type === "instance_name") {
+    entry.mode = "instance_name";
+    const badge = document.createElement("span");
+    badge.className = "type-badge";
+    badge.title = `Python dataclass type: ${field.className}`;
+    badge.innerHTML = `<span>type</span><span class="type-val"></span>`;
+    badge.querySelector(".type-val").textContent = field.className;
+    controlCell.appendChild(badge);
+    return;
+  }
+
   if (field.is_bound) {
     entry.mode = "bound";
     const badge = document.createElement("span");
@@ -434,6 +473,36 @@ function buildControlCell(entry, field) {
 function buildActCell(entry, field) {
   const { actCell } = entry;
   actCell.innerHTML = "";
+  if (field.type === "instance_name") {
+    if (field.is_instance) {
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "row-act-btn";
+      delBtn.title = `Delete instance ${field.value}`;
+      delBtn.innerHTML = "&times;";
+      delBtn.addEventListener("click", () => {
+        store.paramTab = "active";
+        postParamPayload({ action: "delete_instance", name: field.targetShort });
+      });
+      actCell.appendChild(delBtn);
+    } else if (field.is_modified) {
+      const resetBtn = document.createElement("button");
+      resetBtn.type = "button";
+      resetBtn.className = "row-act-btn";
+      resetBtn.title = `Reset instance name to ${field.default_expr}`;
+      resetBtn.textContent = "↺";
+      resetBtn.addEventListener("click", () => {
+        postParamPayload({
+          action: "rename_instance",
+          target: field.targetShort,
+          new_name: field.default_expr,
+        });
+      });
+      actCell.appendChild(resetBtn);
+    }
+    return;
+  }
+
   if (field.key.startsWith("custom.")) {
     if (field.name !== "clearance") {
       const delBtn = document.createElement("button");
@@ -566,6 +635,18 @@ function createParamRow(field) {
 
   const commitExpr = () => {
     const val = exprInput.value.trim();
+    if (field.type === "instance_name") {
+      const nextName = val || field.default_expr;
+      if (field.is_instance && store.paramTab === field.targetShort) {
+        store.paramTab = nextName.replace(/[^a-zA-Z0-9_]/g, "_");
+      }
+      postParamPayload({
+        action: "rename_instance",
+        target: field.targetShort,
+        new_name: nextName,
+      });
+      return;
+    }
     if (!val) {
       postParamPayload({ action: "reset_param", key: field.key });
       return;
@@ -695,7 +776,6 @@ export function initParamsPanel() {
   if (paramAddInstBtn) {
     paramAddInstBtn.addEventListener("click", () => {
       paramInstForm.classList.toggle("hidden");
-      paramRenameForm.classList.add("hidden");
       if (!paramInstForm.classList.contains("hidden")) {
         instNameInput.focus();
       }
@@ -718,38 +798,6 @@ export function initParamsPanel() {
       store.paramTab = name.replace(/[^a-zA-Z0-9_]/g, "_");
       instNameInput.value = "";
       paramInstForm.classList.add("hidden");
-    });
-  }
-
-  if (paramRenameInstBtn) {
-    paramRenameInstBtn.addEventListener("click", () => {
-      paramRenameForm.classList.toggle("hidden");
-      paramInstForm.classList.add("hidden");
-      if (!paramRenameForm.classList.contains("hidden")) {
-        const target = currentRenameTarget();
-        const pstate = store.state.params || {};
-        const curAlias = (pstate.aliases && pstate.aliases[target]) || target;
-        renameInstInput.value = curAlias;
-        renameInstInput.focus();
-        renameInstInput.select();
-      }
-    });
-  }
-
-  if (renameCancelBtn) {
-    renameCancelBtn.addEventListener("click", () => {
-      paramRenameForm.classList.add("hidden");
-    });
-  }
-
-  if (paramRenameForm) {
-    paramRenameForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const target = currentRenameTarget();
-      const new_name = renameInstInput.value.trim();
-      if (!target || !new_name) return;
-      postParamPayload({ action: "rename_instance", target, new_name });
-      paramRenameForm.classList.add("hidden");
     });
   }
 
