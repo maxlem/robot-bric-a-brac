@@ -10,7 +10,6 @@ const paramPanel = document.getElementById("param-panel");
 const paramOpenBtn = document.getElementById("param-open-btn");
 const paramCollapseBtn = document.getElementById("param-collapse-btn");
 const paramAddVarBtn = document.getElementById("param-add-var-btn");
-const paramAddInstBtn = document.getElementById("param-add-inst-btn");
 const paramSavePresetBtn = document.getElementById("param-save-preset-btn");
 const paramSyncPyBtn = document.getElementById("param-sync-py-btn");
 const paramResetAllBtn = document.getElementById("param-reset-all-btn");
@@ -20,10 +19,6 @@ const presetSelect = document.getElementById("preset-select");
 const paramPresetForm = document.getElementById("param-preset-form");
 const presetNameInput = document.getElementById("preset-name-input");
 const presetCancelBtn = document.getElementById("preset-cancel-btn");
-const paramInstForm = document.getElementById("param-inst-form");
-const instNameInput = document.getElementById("inst-name-input");
-const instTypeSelect = document.getElementById("inst-type-select");
-const instCancelBtn = document.getElementById("inst-cancel-btn");
 const paramSearch = document.getElementById("param-search");
 const paramNewVarForm = document.getElementById("param-new-var-form");
 const newVarName = document.getElementById("new-var-name");
@@ -134,21 +129,6 @@ export function renderParamTabs() {
       renderParamSheet(true);
     });
     paramTabs.appendChild(btn);
-  }
-
-  // Populate instance creation type selector with base module classes
-  if (instTypeSelect) {
-    const prevVal = instTypeSelect.value;
-    instTypeSelect.innerHTML = "";
-    for (const m of modShorts) {
-      const minfo = modules[m];
-      if (minfo.is_instance) continue;
-      const opt = document.createElement("option");
-      opt.value = m;
-      opt.textContent = `${minfo.class_name} (${m})`;
-      if (m === prevVal) opt.selected = true;
-      instTypeSelect.appendChild(opt);
-    }
   }
 
   const presets = pstate.presets || [];
@@ -772,34 +752,6 @@ export function initParamsPanel() {
   paramSyncPyBtn.addEventListener("click", () => {
     postParamPayload({ action: "sync_python" });
   });
-
-  if (paramAddInstBtn) {
-    paramAddInstBtn.addEventListener("click", () => {
-      paramInstForm.classList.toggle("hidden");
-      if (!paramInstForm.classList.contains("hidden")) {
-        instNameInput.focus();
-      }
-    });
-  }
-
-  if (instCancelBtn) {
-    instCancelBtn.addEventListener("click", () => {
-      paramInstForm.classList.add("hidden");
-    });
-  }
-
-  if (paramInstForm) {
-    paramInstForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const name = instNameInput.value.trim();
-      const base_type = instTypeSelect.value;
-      if (!name || !base_type) return;
-      postParamPayload({ action: "add_instance", name, base_type });
-      store.paramTab = name.replace(/[^a-zA-Z0-9_]/g, "_");
-      instNameInput.value = "";
-      paramInstForm.classList.add("hidden");
-    });
-  }
 
   if (toggleConstsBtn) {
     toggleConstsBtn.addEventListener("click", () => {
