@@ -35,7 +35,7 @@ OUT = CAD / "build" / "viewer"
 
 # Every module that exposes parts() and optionally assemblies().
 MODULES = [
-    "fixtures.drone_motor_5010",
+    "fixtures.flycat_5010",
     "fixtures.drone_stand",
     "fixtures.dm5010_mount",
 ]

@@ -24,7 +24,7 @@ from params import ParamConfig  # noqa: E402
 
 
 @dataclass(frozen=True)
-class DroneMotor5010(ParamConfig):
+class Flycat5010(ParamConfig):
     CONSTANTS = ("*",)  # Reference hardware envelope & caliper measurements
     boss_d: float = 25.0
     boss_h: float = 10.0
@@ -48,7 +48,7 @@ class DroneMotor5010(ParamConfig):
 
 
 @functools.lru_cache(maxsize=8)
-def build(cfg: DroneMotor5010 = DroneMotor5010()) -> Part:
+def build(cfg: Flycat5010 = Flycat5010()) -> Part:
     # Stator boss, y = -boss_h .. 0. The plate sits on its end face.
     boss = Pos(0, -cfg.boss_h / 2, 0) * Rot(90, 0, 0) * Cylinder(
         cfg.boss_d / 2, cfg.boss_h
@@ -101,14 +101,14 @@ def build(cfg: DroneMotor5010 = DroneMotor5010()) -> Part:
     return motor
 
 
-def parts(cfg: DroneMotor5010 = DroneMotor5010()) -> dict[str, Part]:
-    return {"drone_motor_5010": build(cfg)}
+def parts(cfg: Flycat5010 = Flycat5010()) -> dict[str, Part]:
+    return {"flycat_5010": build(cfg)}
 
 
 def main() -> None:
     from export import export
 
-    export(build(), "drone_motor_5010")
+    export(build(), "flycat_5010")
 
 
 if __name__ == "__main__":

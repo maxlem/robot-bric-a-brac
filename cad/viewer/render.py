@@ -25,7 +25,7 @@ RENDERS = OUT / "renders"
 
 COLORS = {
     "drone_stand": "#8fa8c8",
-    "drone_motor_5010": "#e0a060",
+    "flycat_5010": "#e0a060",
     "drone_magnet_carrier": "#7fc8a0",
     "drone_magnet_holder": "#7fc8a0",
     "drone_magnet": "#c080d0",
